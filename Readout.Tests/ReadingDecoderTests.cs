@@ -30,6 +30,32 @@ public class ReadingDecoderTests
         Assert.Equal(12345, r.Serial);
     }
 
+    [Fact]
+    public void Decode_AcAndDcIconBits_LightTheStackedAcDc()
+    {
+        var ac = Decode(new PacketBuilder { Coupling = Coupling.None, AcIcon = true });
+        var dc = Decode(new PacketBuilder { Coupling = Coupling.None, DcIcon = true });
+        var none = Decode(new PacketBuilder { Coupling = Coupling.None });
+
+        Assert.True(ac.Icons.Ac && !ac.Icons.Dc);
+        Assert.True(dc.Icons.Dc && !dc.Icons.Ac);
+        Assert.False(none.Icons.Ac || none.Icons.Dc);
+    }
+
+    [Fact]
+    public void Decode_MinMaxAll_LightsMinMaxAndAvg()
+    {
+        var all = Decode(new PacketBuilder { MinMax = MinMaxState.All }).Icons;
+        var avg = Decode(new PacketBuilder { MinMax = MinMaxState.Average }).Icons;
+
+        Assert.True(all.Min && all.Max && all.Average);
+        Assert.True(avg.Average && !avg.Min && !avg.Max);
+    }
+
+    [Fact]
+    public void Decode_ArrowBit_LightsTheArrow() =>
+        Assert.True(Decode(new PacketBuilder { Arrow = true }).Icons.Arrow);
+
     [Theory]
     [InlineData(12106, 2, "12.106")]
     [InlineData(5, 1, "0.0005")]

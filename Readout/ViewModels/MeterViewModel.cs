@@ -52,12 +52,18 @@ public sealed partial class MeterViewModel : ObservableObject
         if (_session.State != ConnectionState.Connected)
         {
             ConnectedDetail = "";
+            HasSignal = false;
             return;
         }
 
-        var parts = new List<string>();
         if (_session.SignalStrength is { } rssi)
-            parts.Add($"Signal {rssi} dBm");
+        {
+            SignalBars = SignalQuality.Bars(rssi);
+            SignalDescription = $"Signal {SignalQuality.Describe(rssi)}, {rssi} dBm";
+        }
+        HasSignal = _session.SignalStrength is not null;
+
+        var parts = new List<string>();
         if (_session.Latest?.Packet.LowBattery == true)
             parts.Add("Battery low");
         else if (_session.BatteryVolts is { } volts)
@@ -107,7 +113,13 @@ public sealed partial class MeterViewModel : ObservableObject
     [ObservableProperty]
     private string _connectedLine = "";
 
-    /// <summary>Under it: "Signal −62 dBm · Battery 5.70 V".</summary>
+    /// <summary>Signal strength as 0–4 bars, beside the connected line.</summary>
+    [ObservableProperty] private int _signalBars;
+    [ObservableProperty] private bool _hasSignal;
+    /// <summary>For screen readers, and the bars' tooltip: "Signal good, −68 dBm".</summary>
+    [ObservableProperty] private string _signalDescription = "";
+
+    /// <summary>Under it: "Battery 5.70 V".</summary>
     [ObservableProperty]
     private string _connectedDetail = "";
 

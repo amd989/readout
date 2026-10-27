@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:Readout.ViewModels"
+    xmlns:drawing="clr-namespace:Readout.Drawing"
     x:DataType="vm:ConnectViewModel"
     x:Name="Root"
     Title="Connect a meter">
@@ -28,10 +29,17 @@
                                 Command="{Binding ConnectCommand, Source={RelativeSource AncestorType={x:Type vm:ConnectViewModel}}, x:DataType=vm:ConnectViewModel}"
                                 CommandParameter="{Binding .}" />
                         </Border.GestureRecognizers>
-                        <VerticalStackLayout>
-                            <Label Text="{Binding Name}" FontFamily="OpenSansSemibold" />
-                            <Label Text="{Binding Detail}" Style="{StaticResource SecondaryText}" />
-                        </VerticalStackLayout>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout VerticalOptions="Center">
+                                <Label Text="{Binding Name}" FontFamily="OpenSansSemibold" />
+                                <Label Text="{Binding Detail}" Style="{StaticResource SecondaryText}" />
+                            </VerticalStackLayout>
+                            <drawing:SignalBarsView Grid.Column="1" WidthRequest="22" HeightRequest="17" VerticalOptions="Center"
+                                                    Bars="{Binding SignalBars}"
+                                                    Color="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}"
+                                                    SemanticProperties.Description="{Binding SignalDescription}"
+                                                    ToolTipProperties.Text="{Binding SignalDescription}" />
+                        </Grid>
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>

@@ -24,16 +24,23 @@
                 </Grid>
             </Border>
 
-            <!-- Connected: one slim line, so the meter gets the room. -->
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" IsVisible="{Binding IsConnected}">
-                <Ellipse Fill="#4CAF50" WidthRequest="8" HeightRequest="8" VerticalOptions="Center" />
-                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
-                    <Label Text="{Binding ConnectedLine}" Style="{StaticResource SecondaryText}" LineBreakMode="TailTruncation" />
-                    <Label Text="{Binding ConnectedDetail}" Style="{StaticResource SecondaryText}" FontSize="11"
-                           IsVisible="{Binding ConnectedDetail, Converter={StaticResource NotEmpty}}" />
-                </VerticalStackLayout>
-                <Button Grid.Column="2" Text="Disconnect" Command="{Binding PrimaryActionCommand}" Style="{StaticResource LinkButton}" />
-            </Grid>
+            <!-- Connected: the same card, slimmer, so the meter gets the room. -->
+            <Border Style="{StaticResource Card}" Padding="12,6" IsVisible="{Binding IsConnected}">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                    <Ellipse Fill="#4CAF50" WidthRequest="8" HeightRequest="8" VerticalOptions="Center" />
+                    <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                        <Label Text="{Binding ConnectedLine}" FontSize="14" LineBreakMode="TailTruncation" />
+                        <Label Text="{Binding ConnectedDetail}" Style="{StaticResource SecondaryText}" FontSize="11"
+                               IsVisible="{Binding ConnectedDetail, Converter={StaticResource NotEmpty}}" />
+                    </VerticalStackLayout>
+                    <drawing:SignalBarsView Grid.Column="2" WidthRequest="18" HeightRequest="14" VerticalOptions="Center"
+                                            Bars="{Binding SignalBars}" IsVisible="{Binding HasSignal}"
+                                            Color="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}"
+                                            SemanticProperties.Description="{Binding SignalDescription}"
+                                            ToolTipProperties.Text="{Binding SignalDescription}" />
+                    <Button Grid.Column="3" Text="Disconnect" Command="{Binding PrimaryActionCommand}" Style="{StaticResource LinkButton}" />
+                </Grid>
+            </Border>
 
             <!-- The LCD -->
             <GraphicsView

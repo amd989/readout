@@ -11,7 +11,20 @@ namespace Readout.ViewModels;
 public sealed record MeterItem(DiscoveredMeter Meter)
 {
     public string Name => Meter.Name;
-    public string Detail => $"Signal {Meter.Rssi} dBm";
+    public int SignalBars => SignalQuality.Bars(Meter.Rssi);
+
+    /// <summary>"Excellent signal".</summary>
+    public string Detail
+    {
+        get
+        {
+            var words = SignalQuality.Describe(Meter.Rssi);
+            return $"{char.ToUpperInvariant(words[0])}{words[1..]} signal";
+        }
+    }
+
+    /// <summary>For screen readers and the tooltip, with the number: "Signal excellent, -50 dBm".</summary>
+    public string SignalDescription => $"Signal {SignalQuality.Describe(Meter.Rssi)}, {Meter.Rssi} dBm";
 }
 
 /// <summary>

@@ -19,7 +19,7 @@ public partial class MeterPage : ContentPage
         // The LCD keeps its 2:1 shape at any width.
         Lcd.SizeChanged += (_, _) =>
         {
-            var height = Math.Round(Lcd.Width / 2);
+            var height = Math.Round(Lcd.Width / LcdDrawable.AspectRatio);
             if (Lcd.Width > 0 && Math.Abs(Lcd.HeightRequest - height) > 1)
                 Lcd.HeightRequest = height;
         };

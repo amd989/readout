@@ -353,3 +353,17 @@ public class SimulatedMeterTests
         Assert.Equal(HoldState.Hold, b.Hold);
     }
 }
+
+public class SignalQualityTests
+{
+    [Theory]
+    [InlineData(-40, 4)]
+    [InlineData(-60, 4)]
+    [InlineData(-61, 3)]
+    [InlineData(-70, 3)]
+    [InlineData(-80, 2)]
+    [InlineData(-90, 1)]
+    [InlineData(-91, 0)]
+    public void Bars_FollowTheSignalStrength(int rssi, int bars) =>
+        Assert.Equal(bars, Readout.Core.Connection.SignalQuality.Bars(rssi));
+}

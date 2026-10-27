@@ -187,8 +187,10 @@ public static class ReadingDecoder
         return new Annunciators
         {
             LowZ = packet.Mode == MeterMode.LowZ,
-            Ac = coupling is Coupling.Ac or Coupling.AcPlusDc || packet.Mode == MeterMode.AcMillivolts,
-            Dc = coupling is Coupling.Dc or Coupling.AcPlusDc,
+            // The LCD has one stacked AC/DC pair; the coupling bits and the separate AC and DC
+            // icon bits both light it.
+            Ac = coupling is Coupling.Ac or Coupling.AcPlusDc || packet.Mode == MeterMode.AcMillivolts || packet.AcIcon,
+            Dc = coupling is Coupling.Dc or Coupling.AcPlusDc || packet.DcIcon,
             AcPlusDc = coupling == Coupling.AcPlusDc,
             Auto = packet.AutoRange,
             AutoPowerOff = packet.AutoPowerOff,

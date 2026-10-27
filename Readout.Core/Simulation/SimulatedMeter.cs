@@ -115,28 +115,28 @@ public sealed class SimulatedMeter
                 _autoRange = longPress || !_autoRange;
                 break;
             case MeterKey.Hold:
-                if (_hold == HoldState.Off)
+                // As the manual has it: HOLD, then A-HOLD, then live again.
+                _hold = _hold switch
                 {
-                    _hold = longPress ? HoldState.AutoHold : HoldState.Hold;
-                    _heldValue = _lastLive;
-                }
-                else
-                {
-                    _hold = HoldState.Off;
-                    _heldValue = null;
-                }
+                    HoldState.Off => HoldState.Hold,
+                    HoldState.Hold => HoldState.AutoHold,
+                    _ => HoldState.Off,
+                };
+                _heldValue = _hold == HoldState.Off ? null : _lastLive;
                 break;
             case MeterKey.Rel:
                 _relative = !_relative;
                 _relativeOffset = _lastLive;
                 break;
             case MeterKey.MinMax:
+                // MAX, MIN, AVG, then all three; holding the button leaves.
                 _minMax = longPress ? MinMaxState.Off : _minMax switch
                 {
                     MinMaxState.Off => MinMaxState.Max,
                     MinMaxState.Max => MinMaxState.Min,
                     MinMaxState.Min => MinMaxState.Average,
-                    _ => MinMaxState.Off,
+                    MinMaxState.Average => MinMaxState.All,
+                    _ => MinMaxState.Max,
                 };
                 break;
         }
