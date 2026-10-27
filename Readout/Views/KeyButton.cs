@@ -10,7 +10,8 @@ public sealed class KeyPressedEventArgs(MeterKey key, bool longPress) : EventArg
 
 /// <summary>
 /// One of the meter's buttons. A tap sends a short press; holding it for
-/// <see cref="LongPressTime"/> sends a long press (as on the meter itself), once.
+/// <see cref="LongPressTime"/> sends a long press (as on the meter itself), once. Touching it
+/// gives a light click, and the long press a stronger one, so it feels like a real key.
 /// </summary>
 public sealed class KeyButton : Button
 {
@@ -39,6 +40,7 @@ public sealed class KeyButton : Button
 
     private void OnPressed(object? sender, EventArgs e)
     {
+        Haptic(HapticFeedbackType.Click);
         _longSent = false;
         _timer ??= CreateTimer();
         _timer.Start();
@@ -59,10 +61,15 @@ public sealed class KeyButton : Button
         timer.Tick += (_, _) =>
         {
             _longSent = true;
-            try { HapticFeedback.Default.Perform(HapticFeedbackType.LongPress); }
-            catch (FeatureNotSupportedException) { }
+            Haptic(HapticFeedbackType.LongPress);
             KeyPressed?.Invoke(this, new KeyPressedEventArgs(Key, longPress: true));
         };
         return timer;
+    }
+
+    private static void Haptic(HapticFeedbackType type)
+    {
+        try { HapticFeedback.Default.Perform(type); }
+        catch (FeatureNotSupportedException) { }
     }
 }

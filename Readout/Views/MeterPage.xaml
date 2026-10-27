@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:Readout.ViewModels"
     xmlns:views="clr-namespace:Readout.Views"
+    xmlns:drawing="clr-namespace:Readout.Drawing"
     x:DataType="vm:MeterViewModel"
     Shell.NavBarIsVisible="False"
     Title="Meter">
@@ -40,17 +41,31 @@
                 HeightRequest="200"
                 SemanticProperties.Description="{Binding ReadingDescription}" />
 
-            <!-- The meter's buttons. Hold one for a long press. -->
-            <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8"
+            <!-- The meter's buttons, labelled as on the meter (and its manual): above a button, what
+                 it does in some modes; right under it, what holding it does. The meter's backlight
+                 label (hold MODE) is left out: with the app you're looking at the phone. -->
+            <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8"
                   IsEnabled="{Binding IsConnected}">
-                <views:KeyButton Grid.Row="0" Grid.Column="0" Key="Range" Text="RANGE" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
-                <views:KeyButton Grid.Row="0" Grid.Column="1" Key="Hold" Text="HOLD" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
-                <views:KeyButton Grid.Row="0" Grid.Column="2" Key="Rel" Text="REL ▲" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
-                <views:KeyButton Grid.Row="0" Grid.Column="3" Key="Peak" Text="PEAK ▼" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
-                <views:KeyButton Grid.Row="1" Grid.Column="0" Key="Mode" Text="MODE" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
-                <views:KeyButton Grid.Row="1" Grid.Column="1" Key="MinMax" Text="MIN MAX" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
-                <views:KeyButton Grid.Row="1" Grid.Column="2" Key="Mem" Text="MEM" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
-                <views:KeyButton Grid.Row="1" Grid.Column="3" Key="Setup" Text="SETUP" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
+                <HorizontalStackLayout Grid.Row="0" Grid.Column="0" HorizontalOptions="Center" Spacing="3">
+                    <Label Text="15V" Style="{StaticResource KeyCaption}" />
+                    <drawing:DiodeView WidthRequest="16" HeightRequest="9" VerticalOptions="End" Margin="0,0,0,3"
+                                       Color="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray300}}"
+                                       SemanticProperties.Description="diode" />
+                </HorizontalStackLayout>
+                <Label Grid.Row="0" Grid.Column="1" Text="AutoHOLD" Style="{StaticResource KeyCaption}" />
+                <Label Grid.Row="0" Grid.Column="2" Text="▲" Style="{StaticResource KeyCaption}" />
+                <Label Grid.Row="0" Grid.Column="3" Text="▼" Style="{StaticResource KeyCaption}" />
+                <views:KeyButton Grid.Row="1" Grid.Column="0" Key="Range" Text="RANGE" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
+                <views:KeyButton Grid.Row="1" Grid.Column="1" Key="Hold" Text="HOLD" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
+                <views:KeyButton Grid.Row="1" Grid.Column="2" Key="Rel" Text="REL △" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
+                <views:KeyButton Grid.Row="1" Grid.Column="3" Key="Peak" Text="1ms PEAK" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
+                <Label Grid.Row="2" Grid.Column="2" Text="1kHz" Style="{StaticResource HoldCaption}" />
+                <Label Grid.Row="2" Grid.Column="3" Text="BT" Style="{StaticResource HoldCaption}" />
+
+                <views:KeyButton Grid.Row="3" Grid.Column="0" Key="Mode" Text="MODE" Style="{StaticResource MeterModeButton}" KeyPressed="OnKeyPressed" Margin="0,6,0,0" />
+                <views:KeyButton Grid.Row="3" Grid.Column="1" Key="MinMax" Text="MIN/MAX" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" Margin="0,6,0,0" />
+                <views:KeyButton Grid.Row="3" Grid.Column="2" Key="Mem" Text="MEM" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" Margin="0,6,0,0" />
+                <views:KeyButton Grid.Row="3" Grid.Column="3" Key="Setup" Text="SETUP" Style="{StaticResource MeterSetupButton}" KeyPressed="OnKeyPressed" Margin="0,6,0,0" />
             </Grid>
 
             <!-- Log and graph -->

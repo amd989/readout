@@ -49,8 +49,10 @@
         <Setter Property="BackgroundColor" Value="#292F33" />
         <Setter Property="TextColor" Value="White" />
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="Padding" Value="4,12" />
+        <!-- One line, a touch smaller on Android, so "1ms PEAK" fits a 320 dp wide phone. -->
+        <Setter Property="FontSize" Value="{OnPlatform Default=13, Android=12}" />
+        <Setter Property="LineBreakMode" Value="NoWrap" />
+        <Setter Property="Padding" Value="2,12" />
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="VisualStateManager.VisualStateGroups">
             <VisualStateGroupList>
@@ -70,5 +72,30 @@
                 </VisualStateGroup>
             </VisualStateGroupList>
         </Setter>
+    </Style>
+
+    <!-- MODE and SETUP are red and yellow on the meter; the app matches so they're easy to find. -->
+    <Style x:Key="MeterModeButton" TargetType="Button" BasedOn="{StaticResource MeterKeyButton}">
+        <Setter Property="BackgroundColor" Value="#C8372D" />
+    </Style>
+    <Style x:Key="MeterSetupButton" TargetType="Button" BasedOn="{StaticResource MeterKeyButton}">
+        <Setter Property="BackgroundColor" Value="#F0B323" />
+        <Setter Property="TextColor" Value="#1E2326" />
+    </Style>
+
+    <!-- The small label above a meter button: what it does in some modes, as printed on the meter. -->
+    <Style x:Key="KeyCaption" TargetType="Label">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontFamily" Value="OpenSansSemibold" />
+        <Setter Property="HeightRequest" Value="16" />
+        <Setter Property="HorizontalTextAlignment" Value="Center" />
+        <Setter Property="VerticalTextAlignment" Value="End" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray300}}" />
+    </Style>
+
+    <!-- The small label right under a meter button: what holding it does, as printed on the meter. -->
+    <Style x:Key="HoldCaption" TargetType="Label" BasedOn="{StaticResource KeyCaption}">
+        <Setter Property="VerticalTextAlignment" Value="Start" />
+        <Setter Property="Margin" Value="0,2,0,0" />
     </Style>
 </ResourceDictionary>

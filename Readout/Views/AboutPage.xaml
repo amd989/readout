@@ -17,7 +17,7 @@
 
             <VerticalStackLayout Spacing="6">
                 <Label Text="Meter buttons" FontFamily="OpenSansSemibold" />
-                <Label Text="The buttons under the display work like the ones on the meter. Tap for a short press; hold one for a moment for a long press, the same as holding the button on the meter." />
+                <Label Text="The buttons under the display work like the ones on the meter. Tap for a short press; hold one for a moment for a long press, the same as holding the button on the meter. The small labels are printed on the meter too: above a button, what it does in some modes (▲ and ▼ in SETUP, for example); right under it, what holding it does (1 kHz low-pass filter, Bluetooth on or off)." />
             </VerticalStackLayout>
 
             <Border Style="{StaticResource Card}">

@@ -102,7 +102,7 @@ public sealed class LcdDrawable : IDrawable
         var minMax = i.Max && i.Min ? "MAX MIN" : i.Max ? "MAX" : i.Min ? "MIN" : i.Average ? "AVG" : "MAX";
         Label(canvas, minMax, 150, 50, 11, i.Max || i.Min || i.Average, HorizontalAlignment.Left, 80);
         Label(canvas, "·))", 218, 50, 11, i.Beep);
-        Label(canvas, "▶|", 240, 50, 11, i.Diode);
+        DiodeSymbol.Draw(canvas, new RectF(240, 52, 18, 10), i.Diode ? Ink : Ghost);
 
         // Minus sign and digits.
         var digits = new RectF(78, 68, 250, 82);
