@@ -59,6 +59,21 @@ public sealed class MeterSession
 
     public MeterReading? Latest { get; private set; }
 
+    /// <summary>
+    /// Reconnect by itself: at launch (the app asks) and when the link drops. Off, the user
+    /// connects by hand every time.
+    /// </summary>
+    public bool AutoReconnect { get; set; } = true;
+
+    /// <summary>
+    /// The meter's battery in volts, as last shown on its SETUP battery page; null until the
+    /// meter has shown it (it isn't in the regular packets).
+    /// </summary>
+    public double? BatteryVolts { get; private set; }
+
+    /// <summary>Signal strength of the connected meter in dBm; null when unknown.</summary>
+    public int? SignalStrength => Active.SignalStrength;
+
     /// <summary>Meters seen in the current scan, strongest signal first.</summary>
     public IReadOnlyList<DiscoveredMeter> Discovered =>
         [.. _discovered.Values.OrderByDescending(m => m.Rssi)];
@@ -141,6 +156,8 @@ public sealed class MeterSession
     {
         var reading = ReadingDecoder.Decode(packet, _time.GetLocalNow());
         Latest = reading;
+        if (packet.SubMode == MeterMode.Battery && !packet.SubOverload)
+            BatteryVolts = packet.SubRawValue / Math.Pow(10, packet.SubDecimals);
         if (IsLogging)
             Log.Add(reading);
         ReadingReceived?.Invoke(this, reading);
@@ -159,7 +176,7 @@ public sealed class MeterSession
     {
         // Out of range or switched off: keep looking, and the remembered meter reconnects
         // by itself when it's seen again.
-        if (!_userDisconnected && !IsDemo)
+        if (AutoReconnect && !_userDisconnected && !IsDemo)
             _ = ScanQuietlyAsync();
     }
 

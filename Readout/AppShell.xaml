@@ -7,9 +7,16 @@
     Shell.FlyoutBehavior="Disabled"
     Title="Readout">
 
-    <ShellContent
-        Title="Readout"
-        ContentTemplate="{DataTemplate views:MeterPage}"
-        Route="meter" />
+    <TabBar>
+        <Tab Title="Meter" Icon="tab_meter.png">
+            <ShellContent ContentTemplate="{DataTemplate views:MeterPage}" Route="meter" />
+        </Tab>
+        <Tab Title="Sessions" Icon="tab_sessions.png">
+            <ShellContent ContentTemplate="{DataTemplate views:SessionsPage}" Route="sessions" />
+        </Tab>
+        <Tab Title="Settings" Icon="tab_settings.png">
+            <ShellContent ContentTemplate="{DataTemplate views:SettingsPage}" Route="settings" />
+        </Tab>
+    </TabBar>
 
 </Shell>

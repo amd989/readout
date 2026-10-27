@@ -18,7 +18,7 @@ public sealed class BluetoothUnavailableException(BluetoothState state)
 /// The 121GW over Bluetooth LE, through Plugin.BLE (Android, iOS, Mac Catalyst, Windows).
 /// Subscribes to the meter's data characteristic and frames what arrives into packets.
 /// </summary>
-public sealed class BleMeterConnection : IMeterConnection
+public sealed class BleMeterConnection : IMeterConnection, IDisposable
 {
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
 
@@ -30,6 +30,7 @@ public sealed class BleMeterConnection : IMeterConnection
     private readonly Dictionary<Guid, IDevice> _seen = [];
 
     private CancellationTokenSource? _scanCts;
+    private CancellationTokenSource? _rssiCts;
     private IDevice? _device;
     private ICharacteristic? _data;
     private bool _disconnecting;
@@ -48,6 +49,7 @@ public sealed class BleMeterConnection : IMeterConnection
 
     public ConnectionState State { get; private set; }
     public DiscoveredMeter? Meter { get; private set; }
+    public int? SignalStrength { get; private set; }
     public BluetoothState BluetoothState => _ble.State;
 
     public event EventHandler? StateChanged;
@@ -136,8 +138,10 @@ public sealed class BleMeterConnection : IMeterConnection
             await data.StartUpdatesAsync(timeout.Token);
             _data = data;
 
+            SignalStrength = device.Rssi;
             SetState(ConnectionState.Connected);
             _logger.LogInformation("connected, data on {Characteristic}", data.Id);
+            StartRssiPolling(device);
         }
         catch (Exception ex)
         {
@@ -199,8 +203,33 @@ public sealed class BleMeterConnection : IMeterConnection
         await _data.WriteAsync(command, ct);
     }
 
+    // The signal strength isn't pushed; ask for it every few seconds while connected.
+    private void StartRssiPolling(IDevice device)
+    {
+        _rssiCts?.Cancel();
+        _rssiCts = new CancellationTokenSource();
+        var ct = _rssiCts.Token;
+        _ = Task.Run(async () =>
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(3), ct);
+                    if (await device.UpdateRssiAsync())
+                        SignalStrength = device.Rssi;
+                }
+                catch (OperationCanceledException) { return; }
+                catch (Exception ex) { _logger.LogDebug(ex, "rssi update failed"); }
+            }
+        }, ct);
+    }
+
     private async Task CloseLinkAsync()
     {
+        _rssiCts?.Cancel();
+        _rssiCts = null;
+        SignalStrength = null;
         var data = _data;
         var device = _device;
         _data = null;
@@ -248,11 +277,20 @@ public sealed class BleMeterConnection : IMeterConnection
         _logger.LogWarning("link lost: {Error}", error ?? "disconnected");
         if (_data is not null)
             _data.ValueUpdated -= OnValueUpdated;
+        _rssiCts?.Cancel();
+        _rssiCts = null;
+        SignalStrength = null;
         _data = null;
         _device = null;
         Meter = null;
         SetState(ConnectionState.Disconnected);
         ConnectionLost?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void Dispose()
+    {
+        _scanCts?.Dispose();
+        _rssiCts?.Dispose();
     }
 
     private void SetState(ConnectionState state)

@@ -25,6 +25,9 @@ public interface IMeterConnection
     /// <summary>The meter being connected to or connected; null otherwise.</summary>
     DiscoveredMeter? Meter { get; }
 
+    /// <summary>Signal strength of the connected meter in dBm (−40 strong, −90 weak); null when unknown.</summary>
+    int? SignalStrength { get; }
+
     event EventHandler? StateChanged;
 
     /// <summary>A meter was seen while scanning (again, possibly, with a new signal strength).</summary>

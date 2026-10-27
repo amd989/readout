@@ -26,6 +26,7 @@ public sealed class KeyButton : Button
     {
         Pressed += OnPressed;
         Released += OnReleased;
+        SemanticProperties.SetHint(this, "Hold for a long press");
     }
 
     public MeterKey Key

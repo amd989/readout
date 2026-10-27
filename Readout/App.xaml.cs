@@ -1,4 +1,5 @@
 using Readout.Core.Logging;
+using Readout.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Readout;
@@ -11,8 +12,10 @@ public partial class App : Application
     private readonly RecordingAutosave _autosave;
     private readonly ILogger<App> _logger;
 
-    public App(RecordingAutosave autosave, ILogger<App> logger)
+    public App(RecordingAutosave autosave, ContinuityFeedback continuity, ILogger<App> logger)
     {
+        // Created now so it listens from the first reading on.
+        _ = continuity;
         InitializeComponent();
         _autosave = autosave;
         _logger = logger;

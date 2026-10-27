@@ -27,6 +27,9 @@ public static class MauiProgram
         // which on Apple platforms is what shows the permission prompt).
         builder.Services.AddSingleton<IBluetoothLE>(_ => Plugin.BLE.CrossBluetoothLE.Current);
         builder.Services.AddSingleton<SimulatedMeterConnection>();
+        builder.Services.AddSingleton(_ => new AppSettings(Preferences.Default));
+        builder.Services.AddSingleton<IContinuityTone, ContinuityTone>();
+        builder.Services.AddSingleton<ContinuityFeedback>();
         var fakeBluetooth = UseFakeBluetooth();
         builder.Services.AddSingleton(sp => new BluetoothAccess(
             fakeBluetooth ? null : sp.GetRequiredService<IBluetoothLE>));
@@ -44,6 +47,7 @@ public static class MauiProgram
             {
                 Dispatch = MainThread.BeginInvokeOnMainThread,
                 PreferredMeterId = Preferences.Default.Get<string?>(PreferredMeterKey, null),
+                AutoReconnect = sp.GetRequiredService<AppSettings>().AutoReconnect,
             };
             session.PreferredMeterChanged += (_, meter) => Preferences.Default.Set(PreferredMeterKey, meter.Id);
             return session;
@@ -58,14 +62,23 @@ public static class MauiProgram
         builder.Services.AddSingleton<MeterViewModel>();
         builder.Services.AddTransient<SessionsViewModel>();
         builder.Services.AddTransient<SessionDetailViewModel>();
+        builder.Services.AddTransient<SettingsViewModel>();
         builder.Services.AddTransient<ConnectViewModel>();
 
         builder.Services.AddSingleton<MeterPage>();
         builder.Services.AddTransient<ConnectPage>();
         builder.Services.AddTransient<AboutPage>();
         builder.Services.AddTransient<SessionsPage>();
+        builder.Services.AddTransient<SettingsPage>();
         builder.Services.AddTransient<SessionDetailPage>();
         builder.Services.AddTransient<GraphPage>();
+
+#if IOS || MACCATALYST
+        // Tint only: the bars keep the system material (Liquid Glass on iOS 26).
+        var accent = UIKit.UIColor.FromRGB(0xD9, 0x73, 0x1A);
+        UIKit.UITabBar.Appearance.TintColor = accent;
+        UIKit.UINavigationBar.Appearance.TintColor = accent;
+#endif
 
 #if DEBUG
         builder.Logging.AddDebug();

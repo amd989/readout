@@ -41,7 +41,4 @@ public partial class MeterPage : ContentPage
 
     private async void OnKeyPressed(object? sender, KeyPressedEventArgs e) =>
         await _viewModel.PressKeyAsync(e.Key, e.LongPress);
-
-    private async void OnAboutClicked(object? sender, EventArgs e) =>
-        await Shell.Current.GoToAsync(nameof(AboutPage));
 }

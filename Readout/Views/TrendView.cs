@@ -34,6 +34,17 @@ public sealed class TrendView : GraphicsView
         }
     }
 
+    /// <summary>Above zero: show only the newest this-many seconds (see <see cref="TrendDrawable.RecentSeconds"/>).</summary>
+    public double RecentSeconds
+    {
+        get => _drawable.RecentSeconds;
+        set
+        {
+            _drawable.RecentSeconds = value;
+            Invalidate();
+        }
+    }
+
     public bool Interactive
     {
         get => _interactive;

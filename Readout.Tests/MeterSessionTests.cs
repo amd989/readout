@@ -11,6 +11,7 @@ internal sealed class FakeBluetooth : IMeterConnection
 {
     public ConnectionState State { get; private set; }
     public DiscoveredMeter? Meter { get; private set; }
+    public int? SignalStrength { get; set; }
     public List<(MeterKey Key, bool Long)> Keys { get; } = [];
     public int ScanStarts { get; private set; }
     public bool FailNextConnect { get; set; }
@@ -204,6 +205,42 @@ public sealed class MeterSessionTests : IDisposable
 
         _bluetooth.Discover(Meter);
         Assert.Equal(ConnectionState.Connected, _session.State);
+    }
+
+    [Fact]
+    public async Task AutoReconnectOff_ConnectionLost_DoesNotRescan()
+    {
+        _session.AutoReconnect = false;
+        await _session.ConnectAsync(Meter);
+        var scans = _bluetooth.ScanStarts;
+
+        _bluetooth.Drop();
+
+        Assert.Equal(scans, _bluetooth.ScanStarts);
+        Assert.Equal(ConnectionState.Disconnected, _session.State);
+    }
+
+    [Fact]
+    public async Task BatteryPage_IsRemembered()
+    {
+        await _session.ConnectAsync(Meter);
+        Assert.Null(_session.BatteryVolts);
+
+        _bluetooth.Send(new PacketBuilder { SubMode = MeterMode.Battery, SubRawValue = 570, SubDecimals = 2 }.BuildPacket());
+        _bluetooth.Send(new PacketBuilder { SubMode = MeterMode.Temperature, SubRawValue = 235, SubDecimals = 1 }.BuildPacket());
+
+        Assert.Equal(5.70, _session.BatteryVolts!.Value, 9);
+    }
+
+    [Fact]
+    public async Task SignalStrength_IsTheActiveConnections()
+    {
+        _bluetooth.SignalStrength = -63;
+        await _session.ConnectAsync(Meter);
+        Assert.Equal(-63, _session.SignalStrength);
+
+        await _session.StartDemoAsync();
+        Assert.Equal(SimulatedMeterConnection.DemoMeter.Rssi, _session.SignalStrength);
     }
 
     [Fact]

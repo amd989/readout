@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="Readout.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:Readout.ViewModels"
+    x:DataType="vm:SettingsViewModel"
+    Title="Settings">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16,8,16,24" Spacing="8" MaximumWidthRequest="720">
+
+            <Label Text="CONNECTION" Style="{StaticResource SectionHeader}" />
+            <Border Style="{StaticResource Card}">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout VerticalOptions="Center">
+                        <Label Text="Reconnect by itself" />
+                        <Label Text="To the last meter, at launch and when it comes back in range." Style="{StaticResource SecondaryText}" />
+                    </VerticalStackLayout>
+                    <Switch Grid.Column="1" IsToggled="{Binding AutoReconnect}" VerticalOptions="Center" />
+                </Grid>
+            </Border>
+
+            <Label Text="CONTINUITY" Style="{StaticResource SectionHeader}" Margin="0,12,0,0" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Beep" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding ContinuitySound}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Vibrate" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding ContinuityVibration}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                        <Label Text="On below" VerticalOptions="Center" />
+                        <Entry Grid.Column="1" Text="{Binding OnBelow}" Keyboard="Numeric" WidthRequest="80" HorizontalTextAlignment="End" />
+                        <Label Grid.Column="2" Text="Ω" VerticalOptions="Center" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                        <Label Text="Off above" VerticalOptions="Center" />
+                        <Entry Grid.Column="1" Text="{Binding OffAbove}" Keyboard="Numeric" WidthRequest="80" HorizontalTextAlignment="End" />
+                        <Label Grid.Column="2" Text="Ω" VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+            <Label Text="In continuity and resistance modes, the phone beeps and buzzes below the first value and stops above the second, so a wavering reading doesn't chatter."
+                   Style="{StaticResource SecondaryText}" />
+
+            <Label Text="ABOUT" Style="{StaticResource SectionHeader}" Margin="0,12,0,0" />
+            <Border Style="{StaticResource Card}">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding OpenAboutCommand}" />
+                </Border.GestureRecognizers>
+                <Grid ColumnDefinitions="*,Auto">
+                    <VerticalStackLayout>
+                        <Label Text="About Readout" />
+                        <Label Text="{Binding Version, StringFormat='Version {0}'}" Style="{StaticResource SecondaryText}" />
+                    </VerticalStackLayout>
+                    <Label Grid.Column="1" Text="›" FontSize="22" VerticalOptions="Center" Style="{StaticResource SecondaryText}" />
+                </Grid>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

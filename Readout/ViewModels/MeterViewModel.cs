@@ -38,6 +38,31 @@ public sealed partial class MeterViewModel : ObservableObject
         _session.Log.Changed += (_, _) => RefreshLogThrottled();
         RefreshConnection();
         RefreshLog();
+
+        // Signal strength is polled and the battery is read now and then: refresh the line slowly.
+        Application.Current?.Dispatcher.StartTimer(TimeSpan.FromSeconds(2), () =>
+        {
+            RefreshConnectedDetail();
+            return true;
+        });
+    }
+
+    private void RefreshConnectedDetail()
+    {
+        if (_session.State != ConnectionState.Connected)
+        {
+            ConnectedDetail = "";
+            return;
+        }
+
+        var parts = new List<string>();
+        if (_session.SignalStrength is { } rssi)
+            parts.Add($"Signal {rssi} dBm");
+        if (_session.Latest?.Packet.LowBattery == true)
+            parts.Add("Battery low");
+        else if (_session.BatteryVolts is { } volts)
+            parts.Add(string.Format(CultureInfo.CurrentCulture, "Battery {0:0.00} V", volts));
+        ConnectedDetail = string.Join(" · ", parts);
     }
 
     /// <summary>Raised when the LCD should redraw (every reading).</summary>
@@ -82,6 +107,10 @@ public sealed partial class MeterViewModel : ObservableObject
     [ObservableProperty]
     private string _connectedLine = "";
 
+    /// <summary>Under it: "Signal −62 dBm · Battery 5.70 V".</summary>
+    [ObservableProperty]
+    private string _connectedDetail = "";
+
     [ObservableProperty]
     private string _modeName = "No meter connected";
 
@@ -103,7 +132,7 @@ public sealed partial class MeterViewModel : ObservableObject
     /// <summary>On first appearance: reconnect to the meter used last time, if there is one.</summary>
     public async Task AutoConnectAsync()
     {
-        if (_triedAutoConnect || _session.PreferredMeterId is null) return;
+        if (_triedAutoConnect || _session.PreferredMeterId is null || !_session.AutoReconnect) return;
         _triedAutoConnect = true;
 
         if (await _access.EnsureReadyAsync() is not null) return;
@@ -179,8 +208,8 @@ public sealed partial class MeterViewModel : ObservableObject
             _autosave.Flush();
             RefreshLog();
 
-            if (await page.DisplayAlertAsync("Saved", $"\"{info.Name}\" is in Sessions. A new recording has started.", "View", "OK"))
-                await Shell.Current.GoToAsync($"{nameof(Views.SessionsPage)}/{nameof(Views.SessionDetailPage)}?id={info.Id:N}");
+            if (await page.DisplayAlertAsync("Saved", $"\"{info.Name}\" is in the Sessions tab. A new recording has started.", "View", "OK"))
+                await Shell.Current.GoToAsync($"//sessions/{nameof(Views.SessionDetailPage)}?id={info.Id:N}");
         }
         catch (Exception ex)
         {
@@ -188,9 +217,6 @@ public sealed partial class MeterViewModel : ObservableObject
             await page.DisplayAlertAsync("Couldn't save", ex.Message, "OK");
         }
     }
-
-    [RelayCommand]
-    private Task OpenSessionsAsync() => Shell.Current.GoToAsync(nameof(Views.SessionsPage));
 
     [RelayCommand]
     private Task OpenGraphAsync() => Shell.Current.GoToAsync(nameof(Views.GraphPage));
@@ -225,6 +251,7 @@ public sealed partial class MeterViewModel : ObservableObject
         };
         IsConnected = _session.State == ConnectionState.Connected;
         RefreshConnectedLine();
+        RefreshConnectedDetail();
         if (_session.State == ConnectionState.Disconnected && _session.Latest is null)
             ModeName = "No meter connected";
     }

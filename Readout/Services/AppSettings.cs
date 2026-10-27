@@ -1,0 +1,49 @@
+namespace Readout.Services;
+
+/// <summary>The user's settings, kept in Preferences. <see cref="Changed"/> fires after any change.</summary>
+public sealed class AppSettings
+{
+    private readonly IPreferences _prefs;
+
+    public AppSettings(IPreferences prefs) => _prefs = prefs;
+
+    public event EventHandler? Changed;
+
+    public bool AutoReconnect
+    {
+        get => _prefs.Get("auto-reconnect", true);
+        set => Set("auto-reconnect", value);
+    }
+
+    public bool ContinuitySound
+    {
+        get => _prefs.Get("continuity-sound", true);
+        set => Set("continuity-sound", value);
+    }
+
+    public bool ContinuityVibration
+    {
+        get => _prefs.Get("continuity-vibration", true);
+        set => Set("continuity-vibration", value);
+    }
+
+    /// <summary>Beep below this resistance (Ω).</summary>
+    public double ContinuityOnBelow
+    {
+        get => _prefs.Get("continuity-on-below", 30.0);
+        set => Set("continuity-on-below", Math.Max(0, value));
+    }
+
+    /// <summary>Stop above this resistance (Ω).</summary>
+    public double ContinuityOffAbove
+    {
+        get => _prefs.Get("continuity-off-above", 50.0);
+        set => Set("continuity-off-above", Math.Max(0, value));
+    }
+
+    private void Set<T>(string key, T value)
+    {
+        _prefs.Set(key, value);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+}

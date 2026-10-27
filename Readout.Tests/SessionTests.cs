@@ -213,3 +213,36 @@ public class TrendWindowTests
         Assert.Equal((0.0, 100.0), w.Resolve(100));
     }
 }
+
+public class TrendBucketTests
+{
+    private static readonly DateTimeOffset T0 = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+
+    private static Sample At(double seconds, double value) =>
+        new(T0.AddSeconds(seconds), MeterMode.DcVolts, value, "V", "", "");
+
+    [Fact]
+    public void Groups_readings_by_time_slot_with_min_max_and_average()
+    {
+        var samples = new[] { At(0, 1), At(0.5, 3), At(1.25, 10), At(1.75, 20) };
+
+        var buckets = TrendBucket.Group(samples, T0, TimeSpan.FromSeconds(1));
+
+        Assert.Equal(2, buckets.Count);
+        Assert.Equal((1.0, 3.0, 2.0), (buckets[0].Min, buckets[0].Max, buckets[0].Average));
+        Assert.Equal((10.0, 20.0, 15.0), (buckets[1].Min, buckets[1].Max, buckets[1].Average));
+        Assert.Equal(T0.AddSeconds(1.5), buckets[1].Middle);
+    }
+
+    [Fact]
+    public void A_pause_leaves_no_bucket_spanning_it()
+    {
+        var samples = new[] { At(0, 1), At(0.9, 1), At(60, 2), At(60.5, 2) };
+
+        var buckets = TrendBucket.Group(samples, T0, TimeSpan.FromSeconds(1));
+
+        Assert.Equal(2, buckets.Count);
+        Assert.Equal(T0.AddSeconds(0.9), buckets[0].Last);
+        Assert.Equal(T0.AddSeconds(60), buckets[1].First);
+    }
+}

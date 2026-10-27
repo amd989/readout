@@ -25,6 +25,9 @@ public sealed class SimulatedMeterConnection : IMeterConnection, IDisposable
     public ConnectionState State { get; private set; }
     public DiscoveredMeter? Meter { get; private set; }
 
+    /// <summary>A strong, steady signal while connected.</summary>
+    public int? SignalStrength => State == ConnectionState.Connected ? DemoMeter.Rssi : null;
+
     public event EventHandler? StateChanged;
     public event EventHandler<DiscoveredMeter>? MeterDiscovered;
     public event EventHandler<MeterPacket>? PacketReceived;

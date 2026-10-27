@@ -49,6 +49,9 @@
 		<!-- Splash Screen -->
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#1E2326" BaseSize="128,128" />
 
+		<!-- Images (tab icons) -->
+		<MauiImage Include="Resources\Images\*" />
+
 		<!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
 

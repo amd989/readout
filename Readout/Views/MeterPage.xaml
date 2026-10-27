@@ -6,12 +6,8 @@
     xmlns:vm="clr-namespace:Readout.ViewModels"
     xmlns:views="clr-namespace:Readout.Views"
     x:DataType="vm:MeterViewModel"
-    Title="Readout">
-
-    <ContentPage.ToolbarItems>
-        <ToolbarItem Text="Sessions" Command="{Binding OpenSessionsCommand}" />
-        <ToolbarItem Text="About" Clicked="OnAboutClicked" />
-    </ContentPage.ToolbarItems>
+    Shell.NavBarIsVisible="False"
+    Title="Meter">
 
     <ScrollView>
         <VerticalStackLayout Padding="16,8,16,12" Spacing="10" MaximumWidthRequest="720">
@@ -30,8 +26,11 @@
             <!-- Connected: one slim line, so the meter gets the room. -->
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" IsVisible="{Binding IsConnected}">
                 <Ellipse Fill="#4CAF50" WidthRequest="8" HeightRequest="8" VerticalOptions="Center" />
-                <Label Grid.Column="1" Text="{Binding ConnectedLine}" Style="{StaticResource SecondaryText}"
-                       LineBreakMode="TailTruncation" VerticalOptions="Center" />
+                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                    <Label Text="{Binding ConnectedLine}" Style="{StaticResource SecondaryText}" LineBreakMode="TailTruncation" />
+                    <Label Text="{Binding ConnectedDetail}" Style="{StaticResource SecondaryText}" FontSize="11"
+                           IsVisible="{Binding ConnectedDetail, Converter={StaticResource NotEmpty}}" />
+                </VerticalStackLayout>
                 <Button Grid.Column="2" Text="Disconnect" Command="{Binding PrimaryActionCommand}" Style="{StaticResource LinkButton}" />
             </Grid>
 
@@ -53,7 +52,6 @@
                 <views:KeyButton Grid.Row="1" Grid.Column="2" Key="Mem" Text="MEM" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
                 <views:KeyButton Grid.Row="1" Grid.Column="3" Key="Setup" Text="SETUP" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
             </Grid>
-            <Label Text="Hold a button for a long press." Style="{StaticResource SecondaryText}" HorizontalOptions="Center" />
 
             <!-- Log and graph -->
             <Border Style="{StaticResource Card}">
@@ -62,7 +60,7 @@
                         <Label Text="Trend" FontFamily="OpenSansSemibold" VerticalOptions="Center" />
                         <Button Grid.Column="1" Text="Full screen" Command="{Binding OpenGraphCommand}" Style="{StaticResource LinkButton}" />
                     </Grid>
-                    <views:TrendView x:Name="Trend" HeightRequest="170">
+                    <views:TrendView x:Name="Trend" HeightRequest="170" RecentSeconds="600">
                         <views:TrendView.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding OpenGraphCommand}" />
                         </views:TrendView.GestureRecognizers>

@@ -9,11 +9,17 @@ Windows. Built with .NET 10 and .NET MAUI.
 - **Logging.** Every reading is logged while connected, with a live trend graph and
   min/max/average/peak-to-peak. Logging keeps running with the screen locked (iOS), and the
   recording is kept on disk, so closing the app doesn't lose it.
-- **Zoomable graph.** Full screen, pinch to zoom, drag to pan.
+- **Readable graphs.** The meter screen shows the last 10 minutes; full screen shows the whole
+  recording, with long recordings drawn as an average line over a min/max band. Pinch to
+  zoom, drag to pan.
 - **Saved sessions.** Save a recording with a name and notes; each keeps its graph and
   statistics.
 - **CSV export.** Timestamped readings in SI units, ready for a spreadsheet.
-- **Reconnects by itself** to the last meter when it comes back in range.
+- **Continuity beep.** In continuity and resistance modes the phone beeps and vibrates below
+  a threshold you set, with hysteresis so it doesn't chatter.
+- **Signal and battery.** The connection line shows the meter's signal strength and battery.
+- **Reconnects by itself** to the last meter when it comes back in range (can be turned off
+  in Settings).
 - **Demo meter.** Try the app without a meter (simulated readings).
 
 > Readout is an independent, open-source project. It is not made, endorsed or supported

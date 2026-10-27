@@ -15,6 +15,11 @@
 
             <Label Text="A companion app for the EEVblog 121GW multimeter. See its readings live, press its buttons remotely, log measurements and export them as CSV." />
 
+            <VerticalStackLayout Spacing="6">
+                <Label Text="Meter buttons" FontFamily="OpenSansSemibold" />
+                <Label Text="The buttons under the display work like the ones on the meter. Tap for a short press; hold one for a moment for a long press, the same as holding the button on the meter." />
+            </VerticalStackLayout>
+
             <Border Style="{StaticResource Card}">
                 <Label Style="{StaticResource SecondaryText}"
                        Text="Readout is an independent, open-source project. It is not made, endorsed or supported by EEVblog. 121GW and EEVblog are trademarks of their owners and are used here only to say which meter the app works with." />

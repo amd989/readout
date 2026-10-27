@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:views="clr-namespace:Readout.Views">
+
+    <views:NotEmptyConverter x:Key="NotEmpty" />
 
     <!-- A rounded panel for grouped content. -->
     <Style x:Key="Card" TargetType="Border">
@@ -9,6 +12,12 @@
         <Setter Property="StrokeThickness" Value="0" />
         <Setter Property="StrokeShape" Value="RoundRectangle 12" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F1F2EE, Dark=#23282B}" />
+    </Style>
+
+    <Style x:Key="SectionHeader" TargetType="Label">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Margin" Value="4,0" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
     </Style>
 
     <Style x:Key="SecondaryText" TargetType="Label">

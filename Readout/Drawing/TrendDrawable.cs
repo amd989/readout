@@ -28,6 +28,12 @@ public sealed class TrendDrawable : IDrawable
         return first is null ? 0 : (last!.Value - first.Value).TotalSeconds;
     }
 
+    /// <summary>
+    /// When above zero and not zoomed, shows only the newest this-many seconds, so a small
+    /// live graph stays readable however long the recording gets.
+    /// </summary>
+    public double RecentSeconds { get; set; }
+
     public Color LineColor { get; set; } = Color.FromArgb("#E07A1F");
     public Color GridColor { get; set; } = Colors.Gray.WithAlpha(0.3f);
     public Color TextColor { get; set; } = Colors.Gray;
@@ -62,6 +68,8 @@ public sealed class TrendDrawable : IDrawable
         var start = all[0].Time;
         var dataSpan = Math.Max((all[^1].Time - start).TotalSeconds, 1e-3);
         var (fromSec, toSec) = Window?.Resolve(dataSpan) ?? (0, dataSpan);
+        var showsRecent = RecentSeconds > 0 && Window?.IsZoomed != true && dataSpan > RecentSeconds;
+        if (showsRecent) (fromSec, toSec) = (dataSpan - RecentSeconds, dataSpan);
         var t0 = start.AddSeconds(fromSec);
         var span = Math.Max(toSec - fromSec, 1e-3);
 
@@ -92,47 +100,71 @@ public sealed class TrendDrawable : IDrawable
         float X(Sample s) => plot.X + (float)((s.Time - t0).TotalSeconds / span) * plot.Width;
         float Y(double v) => plot.Bottom - (float)((v - min) / (max - min)) * plot.Height;
 
-        // Long logs: split into buckets of about one pixel column and draw each bucket's min
-        // and max, in time order, so spikes survive and drawing stays fast.
-        var path = new PathF();
-        var columns = Math.Max(1, (int)plot.Width);
-        var step = Math.Max(1, withValues.Count / columns);
         // A pause in the readings (disconnected, logging paused, overload) leaves a gap rather
         // than a straight line across it. Long logs draw buckets, so allow a few buckets apart.
+        var columns = Math.Max(1, (int)plot.Width);
         var gap = TimeSpan.FromSeconds(Math.Max(2, span / columns * 3));
-        DateTimeOffset? last = null;
-        void Add(Sample s)
-        {
-            var p = new PointF(X(s), Y(s.Value!.Value));
-            if (last is null || s.Time - last.Value > gap) path.MoveTo(p);
-            else path.LineTo(p);
-            last = s.Time;
-        }
-
-        for (var i = 0; i < withValues.Count; i += step)
-        {
-            var end = Math.Min(withValues.Count, i + step);
-            int lo = i, hi = i;
-            for (var j = i + 1; j < end; j++)
-            {
-                if (withValues[j].Value < withValues[lo].Value) lo = j;
-                if (withValues[j].Value > withValues[hi].Value) hi = j;
-            }
-            Add(withValues[Math.Min(lo, hi)]);
-            if (lo != hi) Add(withValues[Math.Max(lo, hi)]);
-        }
 
         canvas.SaveState();
         canvas.ClipRectangle(plot);
         canvas.StrokeColor = LineColor;
         canvas.StrokeSize = 2;
         canvas.StrokeLineJoin = LineJoin.Round;
-        canvas.DrawPath(path);
+
+        if (withValues.Count <= columns * 2)
+        {
+            // Few enough readings to draw each one.
+            var path = new PathF();
+            DateTimeOffset? last = null;
+            foreach (var s in withValues)
+            {
+                var p = new PointF(X(s), Y(s.Value!.Value));
+                if (last is null || s.Time - last.Value > gap) path.MoveTo(p);
+                else path.LineTo(p);
+                last = s.Time;
+            }
+            canvas.DrawPath(path);
+        }
+        else
+        {
+            // Long logs: about one bucket per pixel column. Each bucket's min to max is a faint
+            // band (so spikes and noise still show) and its average is the line, so a noisy
+            // reading doesn't turn into a solid block.
+            var buckets = TrendBucket.Group(withValues, t0, TimeSpan.FromSeconds(span / columns));
+            var run = new List<TrendBucket>();
+            void Flush()
+            {
+                if (run.Count == 0) return;
+                var band = new PathF();
+                band.MoveTo(BucketX(run[0]), Y(run[0].Max));
+                foreach (var b in run.Skip(1)) band.LineTo(BucketX(b), Y(b.Max));
+                for (var k = run.Count - 1; k >= 0; k--) band.LineTo(BucketX(run[k]), Y(run[k].Min));
+                band.Close();
+                canvas.FillColor = LineColor.WithAlpha(0.28f);
+                canvas.FillPath(band);
+                if (run.Count == 1)
+                    canvas.DrawLine(BucketX(run[0]), Y(run[0].Max), BucketX(run[0]), Y(run[0].Min));
+
+                var line = new PathF();
+                line.MoveTo(BucketX(run[0]), Y(run[0].Average));
+                foreach (var b in run.Skip(1)) line.LineTo(BucketX(b), Y(b.Average));
+                canvas.DrawPath(line);
+                run.Clear();
+            }
+            foreach (var b in buckets)
+            {
+                if (run.Count > 0 && b.First - run[^1].Last > gap) Flush();
+                run.Add(b);
+            }
+            Flush();
+        }
         canvas.RestoreState();
+
+        float BucketX(TrendBucket b) => plot.X + (float)((b.Middle - t0).TotalSeconds / span) * plot.Width;
 
         canvas.DrawString(SiFormat.Format(max, unit, provider: CultureInfo.CurrentCulture), plot.X, rect.Y + 2, plot.Width, 16, HorizontalAlignment.Left, VerticalAlignment.Center);
         canvas.DrawString(SiFormat.Format(min, unit, provider: CultureInfo.CurrentCulture), plot.X, plot.Bottom + 2, plot.Width / 2, 16, HorizontalAlignment.Left, VerticalAlignment.Center);
-        var spanText = Window?.IsZoomed == true ? $"{FormatSpan(span)} of {FormatSpan(dataSpan)}" : FormatSpan(span);
+        var spanText = Window?.IsZoomed == true || showsRecent ? $"{FormatSpan(span)} of {FormatSpan(dataSpan)}" : FormatSpan(span);
         canvas.DrawString(spanText, plot.X + plot.Width / 2, plot.Bottom + 2, plot.Width / 2, 16, HorizontalAlignment.Right, VerticalAlignment.Center);
         canvas.DrawString(t0.ToLocalTime().ToString("T", CultureInfo.CurrentCulture) + " – " + t0.AddSeconds(span).ToLocalTime().ToString("T", CultureInfo.CurrentCulture),
             plot.X + plot.Width / 2, rect.Y + 2, plot.Width / 2, 16, HorizontalAlignment.Right, VerticalAlignment.Center);
