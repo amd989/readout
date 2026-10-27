@@ -54,7 +54,15 @@ public sealed partial class MeterViewModel : ObservableObject
     private string _primaryActionText = "Connect";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowConnectCard))]
     private bool _isConnected;
+
+    /// <summary>The big connection card shows only until a meter is connected.</summary>
+    public bool ShowConnectCard => !IsConnected;
+
+    /// <summary>The slim status line while connected: "121GW · DC voltage".</summary>
+    [ObservableProperty]
+    private string _connectedLine = "";
 
     [ObservableProperty]
     private string _modeName = "No meter connected";
@@ -83,7 +91,7 @@ public sealed partial class MeterViewModel : ObservableObject
         if (await _access.EnsureReadyAsync() is not null) return;
         try
         {
-            await _session.StartScanAsync();
+            await _session.StartScanAsync(autoConnect: true);
         }
         catch (Exception ex)
         {
@@ -153,7 +161,14 @@ public sealed partial class MeterViewModel : ObservableObject
         ReadingDescription = reading.Sub.Text.Length > 0
             ? $"{reading.MainLine}, {reading.Sub.Line}"
             : reading.MainLine;
+        RefreshConnectedLine();
         DisplayChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void RefreshConnectedLine()
+    {
+        var name = _session.IsDemo ? "Demo meter" : _session.Meter?.Name ?? "";
+        ConnectedLine = _session.Latest is null ? name : $"{name} · {ModeName}";
     }
 
     private void RefreshConnection()
@@ -168,6 +183,7 @@ public sealed partial class MeterViewModel : ObservableObject
             _ => ("Not connected", "Connect"),
         };
         IsConnected = _session.State == ConnectionState.Connected;
+        RefreshConnectedLine();
         if (_session.State == ConnectionState.Disconnected && _session.Latest is null)
             ModeName = "No meter connected";
     }

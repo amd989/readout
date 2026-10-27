@@ -13,10 +13,10 @@
     </ContentPage.ToolbarItems>
 
     <ScrollView>
-        <VerticalStackLayout Padding="16,12" Spacing="14" MaximumWidthRequest="720">
+        <VerticalStackLayout Padding="16,8,16,12" Spacing="10" MaximumWidthRequest="720">
 
-            <!-- Connection -->
-            <Border Style="{StaticResource Card}">
+            <!-- Not connected: a card whose main action is Connect. -->
+            <Border Style="{StaticResource Card}" IsVisible="{Binding ShowConnectCard}">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout VerticalOptions="Center">
                         <Label Text="{Binding StatusText}" FontFamily="OpenSansSemibold" />
@@ -25,6 +25,14 @@
                     <Button Grid.Column="1" Text="{Binding PrimaryActionText}" Command="{Binding PrimaryActionCommand}" />
                 </Grid>
             </Border>
+
+            <!-- Connected: one slim line, so the meter gets the room. -->
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" IsVisible="{Binding IsConnected}">
+                <Ellipse Fill="#4CAF50" WidthRequest="8" HeightRequest="8" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding ConnectedLine}" Style="{StaticResource SecondaryText}"
+                       LineBreakMode="TailTruncation" VerticalOptions="Center" />
+                <Button Grid.Column="2" Text="Disconnect" Command="{Binding PrimaryActionCommand}" Style="{StaticResource LinkButton}" />
+            </Grid>
 
             <!-- The LCD -->
             <GraphicsView
@@ -44,13 +52,13 @@
                 <views:KeyButton Grid.Row="1" Grid.Column="2" Key="Mem" Text="MEM" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
                 <views:KeyButton Grid.Row="1" Grid.Column="3" Key="Setup" Text="SETUP" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
             </Grid>
-            <Label Text="Tap a button to press it on the meter. Hold it for a long press." Style="{StaticResource SecondaryText}" HorizontalOptions="Center" />
+            <Label Text="Hold a button for a long press." Style="{StaticResource SecondaryText}" HorizontalOptions="Center" />
 
             <!-- Log and graph -->
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="8">
                     <Label Text="Trend" FontFamily="OpenSansSemibold" />
-                    <GraphicsView x:Name="Trend" HeightRequest="220" />
+                    <GraphicsView x:Name="Trend" HeightRequest="170" />
                     <Label Text="{Binding Statistics}" Style="{StaticResource SecondaryText}" />
                     <Label Text="{Binding LogSummary}" Style="{StaticResource SecondaryText}" />
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">

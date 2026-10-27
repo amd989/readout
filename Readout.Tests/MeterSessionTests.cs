@@ -133,10 +133,45 @@ public sealed class MeterSessionTests : IDisposable
     }
 
     [Fact]
-    public async Task Scan_SeeingThePreferredMeter_ConnectsByItself()
+    public async Task UserScan_SeeingThePreferredMeter_WaitsForAPick()
     {
         _session.PreferredMeterId = Meter.Id;
         await _session.StartScanAsync();
+
+        _bluetooth.Discover(Meter);
+
+        Assert.Equal(ConnectionState.Scanning, _session.State);
+        Assert.Equal(Meter, Assert.Single(_session.Discovered));
+    }
+
+    [Fact]
+    public async Task DisconnectThenUserScan_DoesNotReconnectByItself()
+    {
+        await _session.ConnectAsync(Meter);
+        await _session.DisconnectAsync();
+
+        await _session.StartScanAsync();
+        _bluetooth.Discover(Meter);
+
+        Assert.Equal(ConnectionState.Scanning, _session.State);
+    }
+
+    [Fact]
+    public async Task UserScan_DuringABackgroundScan_KeepsTheMetersAlreadySeen()
+    {
+        await _session.StartScanAsync(autoConnect: true);
+        _bluetooth.Discover(new DiscoveredMeter("other", "121GW", -70));
+
+        await _session.StartScanAsync();
+
+        Assert.Equal("other", Assert.Single(_session.Discovered).Id);
+    }
+
+    [Fact]
+    public async Task AutoConnectScan_SeeingThePreferredMeter_ConnectsByItself()
+    {
+        _session.PreferredMeterId = Meter.Id;
+        await _session.StartScanAsync(autoConnect: true);
 
         _bluetooth.Discover(new DiscoveredMeter("other", "121GW", -40));
         Assert.Equal(ConnectionState.Scanning, _session.State);
@@ -158,15 +193,17 @@ public sealed class MeterSessionTests : IDisposable
     }
 
     [Fact]
-    public async Task ConnectionLost_StartsScanningAgain()
+    public async Task ConnectionLost_ScansAndReconnectsWhenTheMeterIsBack()
     {
         await _session.ConnectAsync(Meter);
         var scans = _bluetooth.ScanStarts;
 
         _bluetooth.Drop();
-
         Assert.Equal(scans + 1, _bluetooth.ScanStarts);
         Assert.Equal(ConnectionState.Scanning, _session.State);
+
+        _bluetooth.Discover(Meter);
+        Assert.Equal(ConnectionState.Connected, _session.State);
     }
 
     [Fact]
@@ -185,7 +222,7 @@ public sealed class MeterSessionTests : IDisposable
     public async Task AutoConnectFailure_GoesBackToScanning()
     {
         _session.PreferredMeterId = Meter.Id;
-        await _session.StartScanAsync();
+        await _session.StartScanAsync(autoConnect: true);
         _bluetooth.FailNextConnect = true;
 
         _bluetooth.Discover(Meter);

@@ -87,7 +87,8 @@ public sealed partial class ConnectViewModel : ObservableObject
         {
             _logger.LogWarning(ex, "connect failed");
             StatusText = $"Couldn't connect to {item.Name}. Move closer and try again.";
-            await _session.StartScanAsync();
+            try { await _session.StartScanAsync(); }
+            catch (Exception scanEx) { _logger.LogWarning(scanEx, "rescan failed"); }
         }
         finally
         {
@@ -112,14 +113,10 @@ public sealed partial class ConnectViewModel : ObservableObject
 
     private void OnDiscoveredChanged(object? sender, EventArgs e) => Refresh();
 
-    private void OnStateChanged(object? sender, EventArgs e)
-    {
+    // Only the user's tap closes this page. (Closing it from here as well raced the page's own
+    // opening animation and could leave Shell's top bar behind.)
+    private void OnStateChanged(object? sender, EventArgs e) =>
         IsScanning = _session.State == ConnectionState.Scanning;
-
-        // Connected by itself (the remembered meter showed up): nothing left to do here.
-        if (_session.State == ConnectionState.Connected && !_connecting)
-            _ = Shell.Current.GoToAsync("..");
-    }
 
     private void Refresh()
     {

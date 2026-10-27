@@ -24,6 +24,17 @@
         <Setter Property="BorderWidth" Value="1" />
     </Style>
 
+    <!-- A small text-only action, inline with other text. -->
+    <Style x:Key="LinkButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Tertiary}, Dark={StaticResource SecondaryDarkText}}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="6,0" />
+        <Setter Property="MinimumHeightRequest" Value="28" />
+        <Setter Property="HeightRequest" Value="32" />
+        <Setter Property="BorderWidth" Value="0" />
+    </Style>
+
     <!-- The meter's front-panel buttons. -->
     <Style x:Key="MeterKeyButton" TargetType="Button">
         <Setter Property="BackgroundColor" Value="#292F33" />

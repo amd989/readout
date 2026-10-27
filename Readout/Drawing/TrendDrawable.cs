@@ -70,12 +70,16 @@ public sealed class TrendDrawable : IDrawable
         var path = new PathF();
         var columns = Math.Max(1, (int)plot.Width);
         var step = Math.Max(1, withValues.Count / columns);
-        var first = true;
+        // A pause in the readings (disconnected, logging paused, overload) leaves a gap rather
+        // than a straight line across it. Long logs draw buckets, so allow a few buckets apart.
+        var gap = TimeSpan.FromSeconds(Math.Max(2, span / columns * 3));
+        DateTimeOffset? last = null;
         void Add(Sample s)
         {
             var p = new PointF(X(s), Y(s.Value!.Value));
-            if (first) { path.MoveTo(p); first = false; }
+            if (last is null || s.Time - last.Value > gap) path.MoveTo(p);
             else path.LineTo(p);
+            last = s.Time;
         }
 
         for (var i = 0; i < withValues.Count; i += step)

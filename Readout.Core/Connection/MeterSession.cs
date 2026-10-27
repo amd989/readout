@@ -20,6 +20,7 @@ public sealed class MeterSession
     private readonly TimeProvider _time;
     private readonly Dictionary<string, DiscoveredMeter> _discovered = [];
     private bool _userDisconnected;
+    private bool _autoConnect;
 
     public MeterSession(IMeterConnection bluetooth, IMeterConnection demo, TimeProvider? time = null)
     {
@@ -66,11 +67,22 @@ public sealed class MeterSession
     public event EventHandler? DiscoveredChanged;
     public event EventHandler<MeterReading>? ReadingReceived;
 
-    public async Task StartScanAsync(CancellationToken ct = default)
+    /// <summary>Starts looking for meters.</summary>
+    /// <param name="autoConnect">
+    /// Connect by itself when the remembered meter shows up. For background reconnects (at
+    /// launch, after the link drops); a scan the user starts to pick a meter leaves it off.
+    /// </param>
+    public async Task StartScanAsync(bool autoConnect = false, CancellationToken ct = default)
     {
         await LeaveDemoAsync().ConfigureAwait(false);
-        _discovered.Clear();
-        DiscoveredChanged?.Invoke(this, EventArgs.Empty);
+        _autoConnect = autoConnect;
+        // A scan already running (a background reconnect) keeps its list: Bluetooth stacks
+        // report each device once per scan, so what it found won't be reported again.
+        if (_bluetooth.State != ConnectionState.Scanning)
+        {
+            _discovered.Clear();
+            DiscoveredChanged?.Invoke(this, EventArgs.Empty);
+        }
         _userDisconnected = false;
         await _bluetooth.StartScanAsync(ct).ConfigureAwait(false);
     }
@@ -139,7 +151,7 @@ public sealed class MeterSession
         _discovered[meter.Id] = meter;
         DiscoveredChanged?.Invoke(this, EventArgs.Empty);
 
-        if (meter.Id == PreferredMeterId && !IsDemo && _bluetooth.State == ConnectionState.Scanning)
+        if (_autoConnect && meter.Id == PreferredMeterId && !IsDemo && _bluetooth.State == ConnectionState.Scanning)
             _ = ConnectQuietlyAsync(meter);
     }
 
@@ -163,6 +175,7 @@ public sealed class MeterSession
 
     private async Task ScanQuietlyAsync()
     {
+        _autoConnect = true;
         try { await _bluetooth.StartScanAsync().ConfigureAwait(false); }
         catch (Exception)
         {
