@@ -68,6 +68,52 @@ public class MeasurementLogTests
         Assert.Equal([3e-3, 4e-3], run.Select(s => Math.Round(s.Value!.Value, 6)));
     }
 
+    private static Sample At(double seconds, MeterMode mode, double? value) =>
+        new(T0.AddSeconds(seconds), mode, value, "V", "", "");
+
+    [Fact]
+    public void CurrentRunStatistics_MatchesAFullScanOfTheRun()
+    {
+        var log = new MeasurementLog();
+        log.AddRange([At(0, MeterMode.DcVolts, 100), At(1, MeterMode.Resistance, 5)]);
+        log.AddRange([At(2, MeterMode.DcVolts, 3), At(3, MeterMode.DcVolts, null), At(4, MeterMode.DcVolts, -1), At(5, MeterMode.DcVolts, 7)]);
+
+        var expected = MeasurementLog.Statistics(log.CurrentRun(MeterMode.DcVolts));
+
+        Assert.Equal(new LogStatistics(3, -1, 7, 3), expected);
+        Assert.Equal(expected, log.CurrentRunStatistics(MeterMode.DcVolts));
+        Assert.Null(log.CurrentRunStatistics(MeterMode.Resistance));
+    }
+
+    [Fact]
+    public void CurrentRunStatistics_StartsOverOnAModeChangeAndOnClear()
+    {
+        var log = new MeasurementLog();
+        log.AddRange([At(0, MeterMode.DcVolts, 50), At(1, MeterMode.Resistance, 5), At(2, MeterMode.DcVolts, 2)]);
+        Assert.Equal(new LogStatistics(1, 2, 2, 2), log.CurrentRunStatistics(MeterMode.DcVolts));
+
+        log.Clear();
+        Assert.Null(log.CurrentRunStatistics(MeterMode.DcVolts));
+        log.AddRange([At(3, MeterMode.DcVolts, null)]);
+        Assert.Null(log.CurrentRunStatistics(MeterMode.DcVolts));
+        log.AddRange([At(4, MeterMode.DcVolts, 4)]);
+        Assert.Equal(new LogStatistics(1, 4, 4, 4), log.CurrentRunStatistics(MeterMode.DcVolts));
+    }
+
+    [Fact]
+    public void CurrentRun_IsASnapshotThatSurvivesMoreReadingsAndAClear()
+    {
+        var log = new MeasurementLog();
+        log.AddRange([At(0, MeterMode.DcVolts, 1), At(1, MeterMode.DcVolts, 2)]);
+        var run = log.CurrentRun(MeterMode.DcVolts);
+
+        log.AddRange([At(2, MeterMode.DcVolts, 3)]);
+        log.Clear();
+
+        Assert.Equal([1.0, 2.0], run.Select(x => x.Value!.Value));
+        Assert.Throws<ArgumentOutOfRangeException>(() => run[2]);
+    }
+
     [Fact]
     public void Statistics_SkipsOverloads()
     {

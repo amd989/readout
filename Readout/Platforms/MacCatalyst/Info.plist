@@ -31,5 +31,23 @@
 	<string>Readout uses Bluetooth to connect to your 121GW multimeter and show its readings.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- The UIScene lifecycle: required since macOS 27, which stops apps without it. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>__MAUI_DEFAULT_SCENE_CONFIGURATION__</string>
+					<key>UISceneDelegateClassName</key>
+					<string>SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 </dict>
 </plist>

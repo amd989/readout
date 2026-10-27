@@ -22,18 +22,28 @@ public sealed record LogStatistics(int Count, double Min, double Max, double Ave
 /// </summary>
 public sealed class MeasurementLog
 {
-    private readonly List<Sample> _samples = [];
+    // Replaced (not emptied) on Clear, so a CurrentRun handed out earlier keeps its readings.
+    private List<Sample> _samples = [];
+
+    // The newest run of one mode, with its statistics kept as running totals so a long
+    // recording costs the same per reading as a short one.
+    private int _runStart;
+    private int _runCount;
+    private double _runMin, _runMax, _runSum;
 
     public IReadOnlyList<Sample> Samples => _samples;
     public int Count => _samples.Count;
     public DateTimeOffset? StartedAt => _samples.Count > 0 ? _samples[0].Time : null;
+
+    /// <summary>Goes up by one every time the log is cleared.</summary>
+    public int Generation { get; private set; }
 
     /// <summary>Raised after a sample is added or the log is cleared.</summary>
     public event EventHandler? Changed;
 
     public void Add(MeterReading reading)
     {
-        _samples.Add(new Sample(
+        Append(new Sample(
             reading.ReceivedAt,
             reading.Mode,
             reading.BaseValue,
@@ -46,27 +56,61 @@ public sealed class MeasurementLog
     /// <summary>Adds samples read back from storage (an autosaved recording).</summary>
     public void AddRange(IEnumerable<Sample> samples)
     {
-        _samples.AddRange(samples);
+        foreach (var sample in samples)
+            Append(sample);
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
     public void Clear()
     {
-        _samples.Clear();
+        _samples = [];
+        _runStart = 0;
+        _runCount = 0;
+        Generation++;
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void Append(Sample sample)
+    {
+        if (_samples.Count > 0 && _samples[^1].Mode != sample.Mode)
+        {
+            _runStart = _samples.Count;
+            _runCount = 0;
+        }
+        _samples.Add(sample);
+
+        if (sample.Value is not { } v) return;
+        if (_runCount == 0)
+        {
+            _runMin = _runMax = _runSum = v;
+        }
+        else
+        {
+            _runMin = Math.Min(_runMin, v);
+            _runMax = Math.Max(_runMax, v);
+            _runSum += v;
+        }
+        _runCount++;
     }
 
     /// <summary>
     /// The newest run of samples in <paramref name="mode"/>: everything since the meter last
-    /// switched to it. This is what the trend graph plots.
+    /// switched to it. This is what the trend graph plots. A view, not a copy: it stays as it
+    /// was when taken, even after more readings or a clear.
     /// </summary>
-    public IReadOnlyList<Sample> CurrentRun(MeterMode mode)
-    {
-        var start = _samples.Count;
-        while (start > 0 && _samples[start - 1].Mode == mode)
-            start--;
-        return _samples.GetRange(start, _samples.Count - start);
-    }
+    public IReadOnlyList<Sample> CurrentRun(MeterMode mode) =>
+        _samples.Count > 0 && _samples[^1].Mode == mode
+            ? new ListSlice<Sample>(_samples, _runStart, _samples.Count - _runStart)
+            : [];
+
+    /// <summary>
+    /// <see cref="Statistics"/> of <see cref="CurrentRun"/>, without going through it.
+    /// Null when the newest run isn't in <paramref name="mode"/> or has no values.
+    /// </summary>
+    public LogStatistics? CurrentRunStatistics(MeterMode mode) =>
+        _runCount > 0 && _samples[^1].Mode == mode
+            ? new LogStatistics(_runCount, _runMin, _runMax, _runSum / _runCount)
+            : null;
 
     /// <summary>Min, max and average of <paramref name="samples"/> that have a value; null when none do.</summary>
     public static LogStatistics? Statistics(IEnumerable<Sample> samples)

@@ -27,16 +27,19 @@ public partial class App : Application
         Dispatcher.StartTimer(AutosaveInterval, () => { FlushRecording(); return true; });
     }
 
+    // Desktop: a window shaped like a phone in portrait, wide enough for the LCD.
+    internal static readonly Size WindowSize = new(480, 900);
+    internal static readonly Size MinimumWindowSize = new(360, 560);
+
     protected override Window CreateWindow(IActivationState? activationState)
     {
         var window = new Window(new AppShell())
         {
             Title = "Readout",
-            // Desktop: a window shaped like a phone in portrait, wide enough for the LCD.
-            MinimumWidth = 360,
-            MinimumHeight = 560,
-            Width = 480,
-            Height = 900,
+            MinimumWidth = MinimumWindowSize.Width,
+            MinimumHeight = MinimumWindowSize.Height,
+            Width = WindowSize.Width,
+            Height = WindowSize.Height,
         };
         window.Destroying += (_, _) => FlushRecording();
         return window;

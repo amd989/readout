@@ -12,6 +12,7 @@ namespace Readout.Core.Logging;
 public sealed class RecordingAutosave(MeasurementLog log, string path)
 {
     private int _written;
+    private int _generation = log.Generation;
 
     public string Path { get; } = path;
 
@@ -32,8 +33,9 @@ public sealed class RecordingAutosave(MeasurementLog log, string path)
     public void Flush()
     {
         var samples = log.Samples;
-        if (samples.Count < _written)
+        if (log.Generation != _generation || samples.Count < _written)
         {
+            _generation = log.Generation;
             // Cleared (or saved and cleared): start the file over.
             _written = 0;
             if (File.Exists(Path)) File.Delete(Path);

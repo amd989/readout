@@ -133,6 +133,25 @@ public sealed class SessionTests : IDisposable
     }
 
     [Fact]
+    public void Autosave_ClearThenMoreReadingsThanWereWritten_StillStartsOver()
+    {
+        var path = Path.Combine(_dir, "recording.csv");
+        var log = new MeasurementLog();
+        var autosave = new RecordingAutosave(log, path);
+        log.AddRange([S(0, 1)]);
+        autosave.Flush();
+
+        // Cleared, and the new recording outgrew the old one before the next flush.
+        log.Clear();
+        log.AddRange([S(5, 7), S(6, 8), S(7, 9)]);
+        autosave.Flush();
+
+        var relaunched = new MeasurementLog();
+        new RecordingAutosave(relaunched, path).Restore();
+        Assert.Equal([7.0, 8.0, 9.0], relaunched.Samples.Select(x => x.Value!.Value));
+    }
+
+    [Fact]
     public void Autosave_RestoreWithoutAFile_LeavesTheLogEmpty()
     {
         var log = new MeasurementLog();
@@ -232,6 +251,17 @@ public class TrendBucketTests
         Assert.Equal((1.0, 3.0, 2.0), (buckets[0].Min, buckets[0].Max, buckets[0].Average));
         Assert.Equal((10.0, 20.0, 15.0), (buckets[1].Min, buckets[1].Max, buckets[1].Average));
         Assert.Equal(T0.AddSeconds(1.5), buckets[1].Middle);
+    }
+
+    [Fact]
+    public void A_range_leaves_out_readings_without_a_value()
+    {
+        var samples = new[] { At(0, 1), At(0.1, 99), new Sample(T0.AddSeconds(0.2), MeterMode.DcVolts, null, "V", "OFL", ""), At(0.3, 3) };
+
+        var bucket = Assert.Single(TrendBucket.Group(samples, 2, 4, T0, TimeSpan.FromSeconds(1)));
+
+        Assert.Equal((3.0, 3.0, 3.0), (bucket.Min, bucket.Max, bucket.Average));
+        Assert.Equal(T0.AddSeconds(0.3), bucket.First);
     }
 
     [Fact]

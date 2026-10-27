@@ -283,7 +283,7 @@ public sealed partial class MeterViewModel : ObservableObject
             log.Count, Format.Duration(span), _session.IsLogging ? "" : " (paused)");
 
         // Statistics for the run on the graph, not the whole log (it may mix units).
-        if (GraphMode is { } m && MeasurementLog.Statistics(log.CurrentRun(m.Mode)) is { } stats)
+        if (GraphMode is { } m && log.CurrentRunStatistics(m.Mode) is { } stats)
         {
             Statistics = Format.Stats(stats, m.Unit);
             MinText = Format.Value(stats.Min, m.Unit);
