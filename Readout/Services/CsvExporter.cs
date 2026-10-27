@@ -1,27 +1,20 @@
-using System.Globalization;
-using System.Text;
 using Readout.Core.Logging;
 
 namespace Readout.Services;
 
-/// <summary>Writes the log to a CSV file and opens the share sheet for it.</summary>
+/// <summary>Opens the share sheet for a saved session's CSV.</summary>
 public static class CsvExporter
 {
-    public static async Task ShareAsync(MeasurementLog log)
+    public static async Task ShareAsync(SessionStore store, SessionInfo session)
     {
-        var started = log.StartedAt ?? DateTimeOffset.Now;
-        var name = $"readout-{started.ToLocalTime():yyyyMMdd-HHmmss}.csv";
+        // A copy with a readable name: the stored file is named by id.
+        var name = $"readout-{Format.FileName(session.Name)}.csv";
         var path = Path.Combine(FileSystem.CacheDirectory, name);
-
-        // Written on the caller's (main) thread: the log is only touched there.
-        var builder = new StringBuilder();
-        using (var writer = new StringWriter(builder, CultureInfo.InvariantCulture))
-            log.WriteCsv(writer);
-        await File.WriteAllTextAsync(path, builder.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        File.Copy(store.CsvPath(session.Id), path, overwrite: true);
 
         await Share.Default.RequestAsync(new ShareFileRequest
         {
-            Title = "Export measurements",
+            Title = $"Export \"{session.Name}\"",
             File = new ShareFile(path, "text/csv"),
         });
     }

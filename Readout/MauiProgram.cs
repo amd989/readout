@@ -1,4 +1,5 @@
 ﻿using Readout.Core.Connection;
+using Readout.Core.Logging;
 using Readout.Services;
 using Readout.ViewModels;
 using Readout.Views;
@@ -48,12 +49,23 @@ public static class MauiProgram
             return session;
         });
 
+        // Saved sessions, and the live recording kept on disk until it's saved or cleared.
+        builder.Services.AddSingleton(_ => new SessionStore(Path.Combine(FileSystem.AppDataDirectory, "sessions")));
+        builder.Services.AddSingleton(sp => new RecordingAutosave(
+            sp.GetRequiredService<MeterSession>().Log,
+            Path.Combine(FileSystem.AppDataDirectory, "recording.csv")));
+
         builder.Services.AddSingleton<MeterViewModel>();
+        builder.Services.AddTransient<SessionsViewModel>();
+        builder.Services.AddTransient<SessionDetailViewModel>();
         builder.Services.AddTransient<ConnectViewModel>();
 
         builder.Services.AddSingleton<MeterPage>();
         builder.Services.AddTransient<ConnectPage>();
         builder.Services.AddTransient<AboutPage>();
+        builder.Services.AddTransient<SessionsPage>();
+        builder.Services.AddTransient<SessionDetailPage>();
+        builder.Services.AddTransient<GraphPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

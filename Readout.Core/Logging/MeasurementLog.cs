@@ -1,4 +1,3 @@
-using System.Globalization;
 using Readout.Core.Display;
 using Readout.Core.Protocol;
 
@@ -12,7 +11,10 @@ namespace Readout.Core.Logging;
 public sealed record Sample(DateTimeOffset Time, MeterMode Mode, double? Value, string Unit, string Display, string Sub);
 
 /// <summary>Summary of the logged values in one unit.</summary>
-public sealed record LogStatistics(int Count, double Min, double Max, double Average);
+public sealed record LogStatistics(int Count, double Min, double Max, double Average)
+{
+    [System.Text.Json.Serialization.JsonIgnore] public double PeakToPeak => Max - Min;
+}
 
 /// <summary>
 /// Every reading since the log was last cleared. Not thread-safe: add and read from one
@@ -38,6 +40,13 @@ public sealed class MeasurementLog
             reading.BaseUnit,
             reading.MainLine,
             reading.Sub.Label is null ? reading.Sub.Line : ""));
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Adds samples read back from storage (an autosaved recording).</summary>
+    public void AddRange(IEnumerable<Sample> samples)
+    {
+        _samples.AddRange(samples);
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -75,36 +84,6 @@ public sealed class MeasurementLog
         return count == 0 ? null : new LogStatistics(count, min, max, sum / count);
     }
 
-    /// <summary>
-    /// Writes the log as CSV: one row per sample, UTC timestamps, seconds since the first
-    /// sample, and values in SI base units with invariant formatting (a dot for decimals).
-    /// </summary>
-    public void WriteCsv(TextWriter writer)
-    {
-        writer.WriteLine("time_utc,elapsed_s,mode,value,unit,display,sub_display");
-        var start = StartedAt;
-        foreach (var s in _samples)
-        {
-            var elapsed = (s.Time - start!.Value).TotalSeconds;
-            writer.Write(s.Time.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture));
-            writer.Write(',');
-            writer.Write(elapsed.ToString("0.000", CultureInfo.InvariantCulture));
-            writer.Write(',');
-            writer.Write(Csv(s.Mode.ToString()));
-            writer.Write(',');
-            writer.Write(s.Value?.ToString("G10", CultureInfo.InvariantCulture) ?? "");
-            writer.Write(',');
-            writer.Write(Csv(s.Unit));
-            writer.Write(',');
-            writer.Write(Csv(s.Display));
-            writer.Write(',');
-            writer.Write(Csv(s.Sub));
-            writer.WriteLine();
-        }
-    }
-
-    private static string Csv(string field) =>
-        field.AsSpan().IndexOfAny(",\"\r\n") >= 0
-            ? "\"" + field.Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
-            : field;
+    /// <summary>Writes the log as CSV; see <see cref="SampleCsv"/>.</summary>
+    public void WriteCsv(TextWriter writer) => SampleCsv.Write(_samples, writer);
 }

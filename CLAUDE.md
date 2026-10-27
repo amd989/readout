@@ -8,6 +8,8 @@ Readout is a companion app for the EEVblog 121GW multimeter over Bluetooth LE, b
 
 - `Readout.Core/` (plain `net10.0`, warnings are errors): the protocol (`Protocol/`: `MeterPacket`, `PacketFramer`, `MeterCommands`, `MeterBluetooth`), LCD decoding (`Display/`: `ReadingDecoder`, `ModeInfo` range tables, `SiFormat`), logging and CSV (`Logging/`), the simulated meter (`Simulation/`), and the connection contract plus session (`Connection/`: `IMeterConnection`, `SimulatedMeterConnection`, `MeterSession`). No MAUI or Bluetooth stack here, so a future Linux front end can reuse it.
 - `Readout/`: the MAUI app. `Services/BleMeterConnection` implements `IMeterConnection` over Plugin.BLE. `ViewModels/` use CommunityToolkit.Mvvm. `Drawing/` draws the LCD (`LcdDrawable`, `SevenSegment`) and the trend graph with MAUI Graphics.
+- `Readout.Core/Logging/`: `MeasurementLog` (the live log), `SampleCsv` (the CSV format, written and read), `SessionStore` (saved sessions: `{id}.csv` + `{id}.json` in the app data folder), `RecordingAutosave` (appends the live log to `recording.csv` every 10 s and on sleep, restored at launch). `Display/TrendWindow` is the graph's zoom and pan.
+- `Readout/Views/TrendView` is the graph control (pinch, drag, double-tap when `Interactive`); `GraphPage` is it full screen, `SessionsPage` and `SessionDetailPage` list and show saved sessions.
 - `Readout.Tests/`: xUnit v3 tests for the core.
 - `docs/PROTOCOL.md`: the packet format. Read it before touching `Protocol/` or `Display/`.
 

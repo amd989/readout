@@ -7,7 +7,11 @@ Windows. Built with .NET 10 and .NET MAUI.
   and every symbol.
 - **Remote buttons.** Press any of the meter's eight buttons from the app, short or long.
 - **Logging.** Every reading is logged while connected, with a live trend graph and
-  min/max/average. Logging keeps running with the screen locked (iOS).
+  min/max/average/peak-to-peak. Logging keeps running with the screen locked (iOS), and the
+  recording is kept on disk, so closing the app doesn't lose it.
+- **Zoomable graph.** Full screen, pinch to zoom, drag to pan.
+- **Saved sessions.** Save a recording with a name and notes; each keeps its graph and
+  statistics.
 - **CSV export.** Timestamped readings in SI units, ready for a spreadsheet.
 - **Reconnects by itself** to the last meter when it comes back in range.
 - **Demo meter.** Try the app without a meter (simulated readings).

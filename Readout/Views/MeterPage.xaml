@@ -9,6 +9,7 @@
     Title="Readout">
 
     <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Sessions" Command="{Binding OpenSessionsCommand}" />
         <ToolbarItem Text="About" Clicked="OnAboutClicked" />
     </ContentPage.ToolbarItems>
 
@@ -57,14 +58,21 @@
             <!-- Log and graph -->
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="8">
-                    <Label Text="Trend" FontFamily="OpenSansSemibold" />
-                    <GraphicsView x:Name="Trend" HeightRequest="170" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Trend" FontFamily="OpenSansSemibold" VerticalOptions="Center" />
+                        <Button Grid.Column="1" Text="Full screen" Command="{Binding OpenGraphCommand}" Style="{StaticResource LinkButton}" />
+                    </Grid>
+                    <views:TrendView x:Name="Trend" HeightRequest="170">
+                        <views:TrendView.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding OpenGraphCommand}" />
+                        </views:TrendView.GestureRecognizers>
+                    </views:TrendView>
                     <Label Text="{Binding Statistics}" Style="{StaticResource SecondaryText}" />
                     <Label Text="{Binding LogSummary}" Style="{StaticResource SecondaryText}" />
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                         <Button Grid.Column="0" Text="{Binding LoggingActionText}" Command="{Binding ToggleLoggingCommand}" Style="{StaticResource QuietButton}" />
                         <Button Grid.Column="1" Text="Clear" Command="{Binding ClearLogCommand}" IsEnabled="{Binding HasLog}" Style="{StaticResource QuietButton}" />
-                        <Button Grid.Column="2" Text="Export CSV" Command="{Binding ExportCommand}" IsEnabled="{Binding HasLog}" />
+                        <Button Grid.Column="2" Text="Save" Command="{Binding SaveSessionCommand}" IsEnabled="{Binding HasLog}" />
                     </Grid>
                 </VerticalStackLayout>
             </Border>

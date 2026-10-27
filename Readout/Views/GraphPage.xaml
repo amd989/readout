@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="Readout.Views.GraphPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:Readout.ViewModels"
+    xmlns:views="clr-namespace:Readout.Views"
+    x:DataType="vm:MeterViewModel"
+    Title="Trend">
+
+    <!-- Live, full screen. Turn the phone sideways for the widest view. -->
+    <Grid RowDefinitions="Auto,*,Auto" Padding="16,8" RowSpacing="8">
+        <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*,*,*" RowSpacing="6" ColumnSpacing="8">
+            <VerticalStackLayout Grid.ColumnSpan="4"><Label Text="NOW" Style="{StaticResource SecondaryText}" FontSize="11" /><Label Text="{Binding NowText}" FontSize="22" FontFamily="OpenSansSemibold" /></VerticalStackLayout>
+            <VerticalStackLayout Grid.Row="1" Grid.Column="0"><Label Text="MIN" Style="{StaticResource SecondaryText}" FontSize="11" /><Label Text="{Binding MinText}" FontSize="15" LineBreakMode="NoWrap" /></VerticalStackLayout>
+            <VerticalStackLayout Grid.Row="1" Grid.Column="1"><Label Text="MAX" Style="{StaticResource SecondaryText}" FontSize="11" /><Label Text="{Binding MaxText}" FontSize="15" LineBreakMode="NoWrap" /></VerticalStackLayout>
+            <VerticalStackLayout Grid.Row="1" Grid.Column="2"><Label Text="AVG" Style="{StaticResource SecondaryText}" FontSize="11" /><Label Text="{Binding AvgText}" FontSize="15" LineBreakMode="NoWrap" /></VerticalStackLayout>
+            <VerticalStackLayout Grid.Row="1" Grid.Column="3"><Label Text="P-P" Style="{StaticResource SecondaryText}" FontSize="11" /><Label Text="{Binding PeakToPeakText}" FontSize="15" LineBreakMode="NoWrap" /></VerticalStackLayout>
+        </Grid>
+
+        <views:TrendView Grid.Row="1" x:Name="Trend" Interactive="True" />
+
+        <Label Grid.Row="2" Text="Pinch to zoom, drag to pan, double-tap to show everything." Style="{StaticResource SecondaryText}"
+               FontSize="12" HorizontalOptions="Center" />
+    </Grid>
+</ContentPage>

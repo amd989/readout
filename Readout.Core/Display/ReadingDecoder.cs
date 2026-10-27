@@ -11,6 +11,9 @@ public static class ReadingDecoder
 {
     private const int LcdDigits = 5;
 
+    /// <summary>"DC voltage", "Resistance"… for a main mode.</summary>
+    public static string ModeName(MeterMode mode) => ModeInfo.For(mode)?.Name ?? $"Mode {(int)mode}";
+
     public static MeterReading Decode(MeterPacket packet, DateTimeOffset receivedAt)
     {
         var mode = packet.Mode;
@@ -51,7 +54,7 @@ public static class ReadingDecoder
             Packet = packet,
             ReceivedAt = receivedAt,
             Mode = mode,
-            ModeName = info?.Name ?? $"Mode {(int)mode}",
+            ModeName = ModeName(mode),
             MainText = mainText,
             MainNegative = packet.MainNegative,
             MainOverload = packet.MainOverload,

@@ -5,12 +5,28 @@ using Readout.Core.Logging;
 namespace Readout.Drawing;
 
 /// <summary>
-/// A line graph of the current run of readings: value over time, scaled to fit, with the
-/// range and time span as labels.
+/// A line graph of readings: value over time, scaled to fit what's visible, with the range
+/// and time span as labels. <see cref="Window"/> picks the stretch of time shown.
 /// </summary>
 public sealed class TrendDrawable : IDrawable
 {
     public IReadOnlyList<Sample> Samples { get; set; } = [];
+
+    /// <summary>The visible stretch of time; null shows everything.</summary>
+    public TrendWindow? Window { get; set; }
+
+    /// <summary>Seconds from the first to the last reading with a value.</summary>
+    public static double DataSpan(IReadOnlyList<Sample> samples)
+    {
+        DateTimeOffset? first = null, last = null;
+        foreach (var s in samples)
+        {
+            if (s.Value is null) continue;
+            first ??= s.Time;
+            last = s.Time;
+        }
+        return first is null ? 0 : (last!.Value - first.Value).TotalSeconds;
+    }
 
     public Color LineColor { get; set; } = Color.FromArgb("#E07A1F");
     public Color GridColor { get; set; } = Colors.Gray.WithAlpha(0.3f);
@@ -35,13 +51,27 @@ public sealed class TrendDrawable : IDrawable
         canvas.FontSize = 11;
 
         var samples = Samples;
-        var withValues = samples.Where(s => s.Value is not null).ToList();
-        if (withValues.Count < 2)
+        var all = samples.Where(s => s.Value is not null).ToList();
+        if (all.Count < 2)
         {
             canvas.DrawString(samples.Count == 0 ? "No readings yet" : "Waiting for readings…",
                 plot, HorizontalAlignment.Center, VerticalAlignment.Center);
             return;
         }
+
+        var start = all[0].Time;
+        var dataSpan = Math.Max((all[^1].Time - start).TotalSeconds, 1e-3);
+        var (fromSec, toSec) = Window?.Resolve(dataSpan) ?? (0, dataSpan);
+        var t0 = start.AddSeconds(fromSec);
+        var span = Math.Max(toSec - fromSec, 1e-3);
+
+        // The visible readings, plus one each side so the line reaches the edges.
+        var lo0 = all.FindIndex(s => (s.Time - start).TotalSeconds >= fromSec);
+        var hi0 = all.FindLastIndex(s => (s.Time - start).TotalSeconds <= toSec);
+        if (lo0 < 0 || hi0 < 0) return;
+        lo0 = Math.Max(0, lo0 - 1);
+        hi0 = Math.Min(all.Count - 1, hi0 + 1);
+        var withValues = all.GetRange(lo0, hi0 - lo0 + 1);
 
         var unit = withValues[^1].Unit;
         var min = withValues.Min(s => s.Value!.Value);
@@ -58,9 +88,6 @@ public sealed class TrendDrawable : IDrawable
             min -= pad;
             max += pad;
         }
-
-        var t0 = withValues[0].Time;
-        var span = Math.Max((withValues[^1].Time - t0).TotalSeconds, 1e-3);
 
         float X(Sample s) => plot.X + (float)((s.Time - t0).TotalSeconds / span) * plot.Width;
         float Y(double v) => plot.Bottom - (float)((v - min) / (max - min)) * plot.Height;
@@ -95,14 +122,20 @@ public sealed class TrendDrawable : IDrawable
             if (lo != hi) Add(withValues[Math.Max(lo, hi)]);
         }
 
+        canvas.SaveState();
+        canvas.ClipRectangle(plot);
         canvas.StrokeColor = LineColor;
         canvas.StrokeSize = 2;
         canvas.StrokeLineJoin = LineJoin.Round;
         canvas.DrawPath(path);
+        canvas.RestoreState();
 
         canvas.DrawString(SiFormat.Format(max, unit, provider: CultureInfo.CurrentCulture), plot.X, rect.Y + 2, plot.Width, 16, HorizontalAlignment.Left, VerticalAlignment.Center);
         canvas.DrawString(SiFormat.Format(min, unit, provider: CultureInfo.CurrentCulture), plot.X, plot.Bottom + 2, plot.Width / 2, 16, HorizontalAlignment.Left, VerticalAlignment.Center);
-        canvas.DrawString(FormatSpan(span), plot.X + plot.Width / 2, plot.Bottom + 2, plot.Width / 2, 16, HorizontalAlignment.Right, VerticalAlignment.Center);
+        var spanText = Window?.IsZoomed == true ? $"{FormatSpan(span)} of {FormatSpan(dataSpan)}" : FormatSpan(span);
+        canvas.DrawString(spanText, plot.X + plot.Width / 2, plot.Bottom + 2, plot.Width / 2, 16, HorizontalAlignment.Right, VerticalAlignment.Center);
+        canvas.DrawString(t0.ToLocalTime().ToString("T", CultureInfo.CurrentCulture) + " – " + t0.AddSeconds(span).ToLocalTime().ToString("T", CultureInfo.CurrentCulture),
+            plot.X + plot.Width / 2, rect.Y + 2, plot.Width / 2, 16, HorizontalAlignment.Right, VerticalAlignment.Center);
     }
 
     private static string FormatSpan(double seconds) => seconds switch

@@ -15,6 +15,8 @@ public sealed partial class MeterViewModel : ObservableObject
 {
     private readonly MeterSession _session;
     private readonly BluetoothAccess _access;
+    private readonly SessionStore _store;
+    private readonly RecordingAutosave _autosave;
     private readonly ILogger<MeterViewModel> _logger;
     private bool _triedAutoConnect;
     private long _lastLogRefresh;
@@ -22,10 +24,13 @@ public sealed partial class MeterViewModel : ObservableObject
     // The log summary, stats and graph walk the current run, so they refresh at most this often.
     private static readonly TimeSpan LogRefreshInterval = TimeSpan.FromMilliseconds(500);
 
-    public MeterViewModel(MeterSession session, BluetoothAccess access, ILogger<MeterViewModel> logger)
+    public MeterViewModel(MeterSession session, BluetoothAccess access, SessionStore store,
+        RecordingAutosave autosave, ILogger<MeterViewModel> logger)
     {
         _session = session;
         _access = access;
+        _store = store;
+        _autosave = autosave;
         _logger = logger;
 
         _session.StateChanged += (_, _) => RefreshConnection();
@@ -43,9 +48,22 @@ public sealed partial class MeterViewModel : ObservableObject
 
     public MeterReading? Reading => _session.Latest;
 
+    /// <summary>The mode on the graph: the meter's, or (before any reading, after a relaunch) the log's last.</summary>
+    private (MeterMode Mode, string Unit)? GraphMode =>
+        _session.Latest is { } r ? (r.Mode, r.BaseUnit)
+        : _session.Log.Count > 0 ? (_session.Log.Samples[^1].Mode, _session.Log.Samples[^1].Unit)
+        : null;
+
     /// <summary>The samples the graph plots: the newest run in the current mode.</summary>
     public IReadOnlyList<Sample> TrendSamples =>
-        _session.Latest is { } r ? _session.Log.CurrentRun(r.Mode) : [];
+        GraphMode is { } m ? _session.Log.CurrentRun(m.Mode) : [];
+
+    /// <summary>The full-screen graph's header.</summary>
+    [ObservableProperty] private string _nowText = "–";
+    [ObservableProperty] private string _minText = "–";
+    [ObservableProperty] private string _maxText = "–";
+    [ObservableProperty] private string _avgText = "–";
+    [ObservableProperty] private string _peakToPeakText = "–";
 
     [ObservableProperty]
     private string _statusText = "";
@@ -133,7 +151,7 @@ public sealed partial class MeterViewModel : ObservableObject
     {
         if (_session.Log.Count == 0) return;
         var page = Shell.Current.CurrentPage;
-        if (await page.DisplayAlertAsync("Clear the log?", $"This deletes {_session.Log.Count:N0} readings. Export them first if you want to keep them.", "Clear", "Cancel"))
+        if (await page.DisplayAlertAsync("Clear the log?", $"This deletes {_session.Log.Count:N0} readings. Save them as a session first if you want to keep them.", "Clear", "Cancel"))
         {
             _session.Log.Clear();
             RefreshLog();
@@ -141,19 +159,41 @@ public sealed partial class MeterViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task ExportAsync()
+    private async Task SaveSessionAsync()
     {
-        if (_session.Log.Count == 0) return;
+        var log = _session.Log;
+        if (log.Count == 0) return;
+
+        var page = Shell.Current.CurrentPage;
+        var started = log.Samples[0].Time.ToLocalTime();
+        var suggested = $"{ReadingDecoder.ModeName(SessionSummary.MainMode(log.Samples))}, {started:MMM d HH:mm}";
+        var name = await page.DisplayPromptAsync("Save session", "Name it so you can find it later.",
+            "Save", "Cancel", initialValue: suggested, maxLength: 80);
+        if (name is null) return;
+        if (string.IsNullOrWhiteSpace(name)) name = suggested;
+
         try
         {
-            await CsvExporter.ShareAsync(_session.Log);
+            var info = await _store.SaveAsync(name.Trim(), log.Samples);
+            log.Clear();
+            _autosave.Flush();
+            RefreshLog();
+
+            if (await page.DisplayAlertAsync("Saved", $"\"{info.Name}\" is in Sessions. A new recording has started.", "View", "OK"))
+                await Shell.Current.GoToAsync($"{nameof(Views.SessionsPage)}/{nameof(Views.SessionDetailPage)}?id={info.Id:N}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "export failed");
-            await Shell.Current.CurrentPage.DisplayAlertAsync("Export failed", ex.Message, "OK");
+            _logger.LogError(ex, "save failed");
+            await page.DisplayAlertAsync("Couldn't save", ex.Message, "OK");
         }
     }
+
+    [RelayCommand]
+    private Task OpenSessionsAsync() => Shell.Current.GoToAsync(nameof(Views.SessionsPage));
+
+    [RelayCommand]
+    private Task OpenGraphAsync() => Shell.Current.GoToAsync(nameof(Views.GraphPage));
 
     private void OnReading(MeterReading reading)
     {
@@ -162,6 +202,7 @@ public sealed partial class MeterViewModel : ObservableObject
             ? $"{reading.MainLine}, {reading.Sub.Line}"
             : reading.MainLine;
         RefreshConnectedLine();
+        NowText = reading.MainLine;
         DisplayChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -206,27 +247,27 @@ public sealed partial class MeterViewModel : ObservableObject
         {
             LogSummary = _session.IsLogging ? "Readings are logged while connected." : "Logging is paused.";
             Statistics = "";
+            MinText = MaxText = AvgText = PeakToPeakText = "–";
             return;
         }
 
         var span = log.Samples[^1].Time - log.Samples[0].Time;
         LogSummary = string.Format(CultureInfo.CurrentCulture, "{0:N0} readings over {1}{2}",
-            log.Count, FormatSpan(span), _session.IsLogging ? "" : " (paused)");
+            log.Count, Format.Duration(span), _session.IsLogging ? "" : " (paused)");
 
         // Statistics for the run on the graph, not the whole log (it may mix units).
-        if (_session.Latest is { } latest && MeasurementLog.Statistics(log.CurrentRun(latest.Mode)) is { } stats)
+        if (GraphMode is { } m && MeasurementLog.Statistics(log.CurrentRun(m.Mode)) is { } stats)
         {
-            var unit = latest.BaseUnit;
-            Statistics = $"Min {SiFormat.Format(stats.Min, unit, provider: CultureInfo.CurrentCulture)}   Max {SiFormat.Format(stats.Max, unit, provider: CultureInfo.CurrentCulture)}   Avg {SiFormat.Format(stats.Average, unit, provider: CultureInfo.CurrentCulture)}";
+            Statistics = Format.Stats(stats, m.Unit);
+            MinText = Format.Value(stats.Min, m.Unit);
+            MaxText = Format.Value(stats.Max, m.Unit);
+            AvgText = Format.Value(stats.Average, m.Unit);
+            PeakToPeakText = Format.Value(stats.PeakToPeak, m.Unit);
         }
         else
+        {
             Statistics = "";
+            MinText = MaxText = AvgText = PeakToPeakText = "–";
+        }
     }
-
-    private static string FormatSpan(TimeSpan span) => span.TotalSeconds switch
-    {
-        < 60 => $"{span.TotalSeconds:0} s",
-        < 3600 => $"{(int)span.TotalMinutes} min {span.Seconds} s",
-        _ => $"{(int)span.TotalHours} h {span.Minutes} min",
-    };
 }
