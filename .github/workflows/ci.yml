@@ -1,0 +1,25 @@
+# Unit tests on every push and pull request. Readout.Core and its tests are plain net10.0,
+# so they need no MAUI workload and run on Linux.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # TreatWarningsAsErrors is on for the core and tests, so this also fails on new
+      # analyzer or style warnings.
+      - name: Build
+        run: dotnet build Readout.Tests --configuration Release
+
+      - name: Test
+        run: dotnet test --project Readout.Tests --configuration Release --no-build

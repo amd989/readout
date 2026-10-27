@@ -1,0 +1,21 @@
+<Project>
+
+	<!-- Shared by every project in the repository. -->
+	<PropertyGroup>
+		<LangVersion>latest</LangVersion>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+
+		<!-- .NET analyzers at the "recommended" set, plus the .editorconfig style rules at build time. -->
+		<AnalysisLevel>latest-recommended</AnalysisLevel>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+		<Authors>Alejandro Mora</Authors>
+		<Copyright>Copyright (c) 2026 Alejandro Mora</Copyright>
+	</PropertyGroup>
+
+	<!-- Per-machine settings (code signing), kept out of the repository. -->
+	<Import Project="$(MSBuildThisFileDirectory)Directory.Build.local.props"
+	        Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.local.props')" />
+
+</Project>

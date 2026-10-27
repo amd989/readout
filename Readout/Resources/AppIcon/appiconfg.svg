@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="456" height="456" viewBox="0 0 456 456">
+  <!-- LCD glass -->
+  <rect x="98" y="138" width="260" height="180" rx="22" fill="#C5CCB9"/>
+  <!-- Trace across the display -->
+  <polyline points="122,262 160,262 182,206 206,280 230,190 254,262 334,262"
+            fill="none" stroke="#111111" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Accent bar under the glass, like the meter's bar graph -->
+  <rect x="122" y="296" width="120" height="10" rx="4" fill="#D9731A"/>
+</svg>

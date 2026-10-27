@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="Readout.Views.AboutPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="About">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16,12" Spacing="14" MaximumWidthRequest="720">
+
+            <VerticalStackLayout>
+                <Label Text="Readout" FontSize="24" FontFamily="OpenSansSemibold" />
+                <Label x:Name="VersionLabel" Style="{StaticResource SecondaryText}" />
+            </VerticalStackLayout>
+
+            <Label Text="A companion app for the EEVblog 121GW multimeter. See its readings live, press its buttons remotely, log measurements and export them as CSV." />
+
+            <Border Style="{StaticResource Card}">
+                <Label Style="{StaticResource SecondaryText}"
+                       Text="Readout is an independent, open-source project. It is not made, endorsed or supported by EEVblog. 121GW and EEVblog are trademarks of their owners and are used here only to say which meter the app works with." />
+            </Border>
+
+            <VerticalStackLayout Spacing="6">
+                <Label Text="Privacy" FontFamily="OpenSansSemibold" />
+                <Label Text="Readout collects no data. It uses Bluetooth only to talk to your meter. Readings stay on this device unless you export them." />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="6">
+                <Label Text="Source code" FontFamily="OpenSansSemibold" />
+                <Label Text="Readout is free software under the MIT License." />
+                <Button Text="View on GitHub" Clicked="OnSourceClicked" Style="{StaticResource QuietButton}" HorizontalOptions="Start" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="6">
+                <Label Text="Acknowledgements" FontFamily="OpenSansSemibold" />
+                <Label Style="{StaticResource SecondaryText}"
+                       Text="The meter protocol is based on the official EEVblog 121GW app by David Ledger, Copyright (c) 2018 David Ledger, used under the MIT License." />
+                <Label Style="{StaticResource SecondaryText}"
+                       Text="Built with .NET MAUI (MIT, .NET Foundation), Plugin.BLE (MIT), and the CommunityToolkit.Mvvm (MIT, .NET Foundation). Open Sans font under the SIL Open Font License 1.1." />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="6">
+                <Label Text="License" FontFamily="OpenSansSemibold" />
+                <Label x:Name="LicenseLabel" Style="{StaticResource SecondaryText}" FontSize="12" />
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Readout.Core/Readout.Core.csproj" />
+  <Project Path="Readout.Tests/Readout.Tests.csproj" />
+  <Project Path="Readout/Readout.csproj" />
+</Solution>

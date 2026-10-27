@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="Readout.Views.ConnectPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:Readout.ViewModels"
+    x:DataType="vm:ConnectViewModel"
+    x:Name="Root"
+    Title="Connect a meter">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="16,12" RowSpacing="12" MaximumWidthRequest="720">
+
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+            <ActivityIndicator IsRunning="{Binding IsScanning}" IsVisible="{Binding IsScanning}" HeightRequest="20" WidthRequest="20" VerticalOptions="Center" />
+            <Label Grid.Column="1" Text="{Binding StatusText}" Style="{StaticResource SecondaryText}" VerticalOptions="Center" LineBreakMode="WordWrap" />
+        </Grid>
+
+        <!-- Rows are tap targets, not selections (selection can stick on iOS). -->
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Meters}" SelectionMode="None">
+            <CollectionView.EmptyView>
+                <Label Text="No meters found yet." Style="{StaticResource SecondaryText}" HorizontalOptions="Center" Margin="0,24" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:MeterItem">
+                    <Border Style="{StaticResource Card}" Margin="0,4">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer
+                                Command="{Binding ConnectCommand, Source={RelativeSource AncestorType={x:Type vm:ConnectViewModel}}, x:DataType=vm:ConnectViewModel}"
+                                CommandParameter="{Binding .}" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout>
+                            <Label Text="{Binding Name}" FontFamily="OpenSansSemibold" />
+                            <Label Text="{Binding Detail}" Style="{StaticResource SecondaryText}" />
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <VerticalStackLayout Grid.Row="2" Spacing="6">
+            <Label Text="No meter with you? Try the app with a simulated one." Style="{StaticResource SecondaryText}" HorizontalOptions="Center" />
+            <Button Text="Try the demo meter" Command="{Binding DemoCommand}" Style="{StaticResource QuietButton}" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

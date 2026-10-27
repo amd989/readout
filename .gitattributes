@@ -1,0 +1,14 @@
+# LF everywhere, on every OS (the Windows PC included): git stores and checks out text files
+# with LF, whatever core.autocrlf says. .editorconfig sets end_of_line = lf for editors.
+* text=auto eol=lf
+
+# Binary assets: never convert or diff.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.keystore binary
+*.svg text

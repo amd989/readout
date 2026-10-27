@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Everything about the meter that isn't UI or a Bluetooth stack: the packet format, the
+	     display decoding, key commands, logging and the simulated meter. Plain net10.0, so the
+	     tests run anywhere and a future Linux app can reuse it as is. -->
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<RootNamespace>Readout.Core</RootNamespace>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Readout.Tests" />
+	</ItemGroup>
+
+</Project>

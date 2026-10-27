@@ -1,0 +1,13 @@
+<Project>
+
+	<!-- Copy to Directory.Build.local.props (git-ignored) and fill in your identity.
+
+	     Mac Debug builds signed ad hoc tie macOS's Bluetooth permission to a hash of the code,
+	     so every rebuild asks again. Signing with your development certificate ties it to the
+	     bundle id instead. List identities with: security find-identity -v -p codesigning -->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst' and '$(Configuration)' == 'Debug'">
+		<EnableCodeSigning>true</EnableCodeSigning>
+		<CodesignKey>Apple Development: Your Name (TEAMID1234)</CodesignKey>
+	</PropertyGroup>
+
+</Project>
