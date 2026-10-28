@@ -35,13 +35,13 @@
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
                         <Label Text="On below" VerticalOptions="Center" />
-                        <Entry Grid.Column="1" Text="{Binding OnBelow}" Keyboard="Numeric" WidthRequest="80" HorizontalTextAlignment="End" />
-                        <Label Grid.Column="2" Text="Ω" VerticalOptions="Center" />
+                        <Entry Grid.Column="1" Text="{Binding OnBelow}" Style="{StaticResource SettingsNumber}" />
+                        <Label Grid.Column="2" Text="Ω" Style="{StaticResource SettingsUnit}" />
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
                         <Label Text="Off above" VerticalOptions="Center" />
-                        <Entry Grid.Column="1" Text="{Binding OffAbove}" Keyboard="Numeric" WidthRequest="80" HorizontalTextAlignment="End" />
-                        <Label Grid.Column="2" Text="Ω" VerticalOptions="Center" />
+                        <Entry Grid.Column="1" Text="{Binding OffAbove}" Style="{StaticResource SettingsNumber}" />
+                        <Label Grid.Column="2" Text="Ω" Style="{StaticResource SettingsUnit}" />
                     </Grid>
                 </VerticalStackLayout>
             </Border>
@@ -60,14 +60,20 @@
                             </VerticalStackLayout>
                             <Switch Grid.Column="1" IsToggled="{Binding McpEnabled}" VerticalOptions="Center" />
                         </Grid>
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <!-- As wide as a number field, the gap and its unit (90 + 6 + 16), so it starts
+                             where the Ω fields do and ends at the card's edge. -->
+                        <Grid ColumnDefinitions="*,Auto">
                             <Label Text="Port" VerticalOptions="Center" />
-                            <Entry Grid.Column="1" Text="{Binding McpPort}" Keyboard="Numeric" WidthRequest="90" HorizontalTextAlignment="End" />
+                            <Entry Grid.Column="1" Text="{Binding McpPort}" Style="{StaticResource SettingsNumber}" WidthRequest="112" />
                         </Grid>
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                            <Button Text="Copy Claude Code command" Command="{Binding CopyMcpCommandCommand}" Style="{StaticResource QuietButton}" />
-                            <Button Grid.Column="1" Text="New token" Command="{Binding NewMcpTokenCommand}" Style="{StaticResource QuietButton}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout VerticalOptions="Center">
+                                <Label Text="Token" />
+                                <Label Text="Assistants need it to connect. Replace it to cut off ones you've set up." Style="{StaticResource SecondaryText}" />
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1" Text="Replace" Command="{Binding NewMcpTokenCommand}" Style="{StaticResource QuietButton}" VerticalOptions="Center" />
                         </Grid>
+                        <Button Text="Copy Claude Code command" Command="{Binding CopyMcpCommandCommand}" Style="{StaticResource QuietButton}" />
                     </VerticalStackLayout>
                 </Border>
                 <Label Text="Runs a Model Context Protocol (MCP) server on this computer, so an assistant such as Claude can read the meter, see recent readings, press its buttons and save sessions. Only programs on this computer that have the token can use it."

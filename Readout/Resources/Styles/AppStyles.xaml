@@ -98,4 +98,16 @@
         <Setter Property="VerticalTextAlignment" Value="Start" />
         <Setter Property="Margin" Value="0,2,0,0" />
     </Style>
+
+    <!-- Settings: a number field and the unit after it. A field without a unit is widened by
+         the unit's width plus the gap (22), so the left edges line up. -->
+    <Style x:Key="SettingsNumber" TargetType="Entry">
+        <Setter Property="WidthRequest" Value="90" />
+        <Setter Property="Keyboard" Value="Numeric" />
+        <Setter Property="HorizontalTextAlignment" Value="End" />
+    </Style>
+    <Style x:Key="SettingsUnit" TargetType="Label">
+        <Setter Property="WidthRequest" Value="16" />
+        <Setter Property="VerticalOptions" Value="Center" />
+    </Style>
 </ResourceDictionary>
