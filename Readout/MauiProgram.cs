@@ -85,6 +85,18 @@ public static class MauiProgram
         UIKit.UINavigationBar.Appearance.TintColor = accent;
 #endif
 
+#if WINDOWS
+        // A WinUI ToggleSwitch is at least 154px wide, with room for an "On"/"Off" label to the
+        // right of the knob. Without the label it leaves the knob short of the right edge, out
+        // of line with the fields below it. Shrink it to just the knob.
+        Microsoft.Maui.Handlers.SwitchHandler.Mapper.AppendToMapping("KnobOnly", (handler, _) =>
+        {
+            handler.PlatformView.OnContent = null;
+            handler.PlatformView.OffContent = null;
+            handler.PlatformView.MinWidth = 0;
+        });
+#endif
+
 #if DEBUG
         builder.Logging.AddDebug();
         builder.Logging.SetMinimumLevel(LogLevel.Debug);
