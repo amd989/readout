@@ -37,6 +37,7 @@ internal sealed class BlueZMeterConnection : IMeterConnection
     private bool _powered;
     private bool _discovering;
     private bool _disconnecting;
+    private bool _preferredBearerWorks = true;
 
     // The open link: the device's path, its data characteristic and how to write to it.
     private string? _devicePath;
@@ -182,11 +183,17 @@ internal sealed class BlueZMeterConnection : IMeterConnection
         var devicePath = BlueZNames.DevicePath(AdapterPath, meter.Id);
         lock (_gate) _devicePath = devicePath;
 
+        await PreferLeAsync(meter.Id, devicePath).ConfigureAwait(false);
         try
         {
             await _bus.CallAsync(devicePath, BlueZNames.Device1, "Connect").WaitAsync(ct).ConfigureAwait(false);
         }
         catch (DBusErrorReplyException ex) when (ex.ErrorName == "org.bluez.Error.AlreadyConnected") { }
+        catch (DBusErrorReplyException ex) when (ex.ErrorMessage?.StartsWith("br-", StringComparison.Ordinal) == true)
+        {
+            _logger.LogWarning("BlueZ tried Classic Bluetooth for the meter ({Error}), which it doesn't have; run bluetoothd with -E so the app can ask for LE", ex.ErrorMessage);
+            throw;
+        }
 
         // BlueZ discovers the meter's GATT database after connecting; its objects appear then.
         while (!await ServicesResolvedAsync(devicePath).ConfigureAwait(false))
@@ -207,6 +214,42 @@ internal sealed class BlueZMeterConnection : IMeterConnection
 
         // The strength from the scan, until (and unless) BlueZ reports a newer one.
         _rssi.Set(meter.Rssi);
+    }
+
+    /// <summary>
+    /// Asks BlueZ to connect over LE. BlueZ connects a device it takes for dual-mode over Classic
+    /// Bluetooth (Wavelength's Linux build saw that with a Mac on Fedora, where it ended in a
+    /// Classic pairing). The meter is LE-only, so that can't pair, but the connect would fail if
+    /// its advertisement doesn't say so. Device1.PreferredBearer (BlueZ 5.80+) exists only with
+    /// bluetoothd's experimental interfaces on (-E); without it, this just says what to expect.
+    /// </summary>
+    private async Task PreferLeAsync(string address, string devicePath)
+    {
+        if (_preferredBearerWorks)
+        {
+            try
+            {
+                await _bus.SetStringPropertyAsync(devicePath, BlueZNames.Device1, "PreferredBearer", "le").ConfigureAwait(false);
+                return;
+            }
+            catch (DBusErrorReplyException ex)
+            {
+                _preferredBearerWorks = false;
+                _logger.LogInformation("bluez: can't ask for LE ({Error}); fine for a meter that advertises as LE-only", ex.ErrorName);
+            }
+        }
+
+        string? addressType;
+        byte[]? flags;
+        lock (_gate)
+        {
+            _devices.TryGetValue(address, out var props);
+            addressType = props?.String("AddressType");
+            flags = props?.Bytes("AdvertisingFlags");
+        }
+        if (!BlueZNames.IsLeOnly(addressType, flags))
+            _logger.LogWarning("connect {Address}: its advertisement doesn't say LE-only (address {Type}, flags {Flags}), so BlueZ may try Classic Bluetooth",
+                address, addressType ?? "?", flags is { Length: > 0 } ? $"0x{flags[0]:X2}" : "none");
     }
 
     private async Task<bool> ServicesResolvedAsync(string devicePath)

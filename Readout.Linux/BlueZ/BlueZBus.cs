@@ -132,6 +132,17 @@ internal sealed class BlueZBus(ILogger<BlueZBus> logger) : IDisposable
         }, null);
     }
 
+    public Task SetStringPropertyAsync(string path, string @interface, string name, string value)
+    {
+        var connection = Connection;
+        using var writer = connection.GetMessageWriter();
+        writer.WriteMethodCallHeader(BlueZNames.BusName, path, BlueZNames.Properties, "Set", "ssv", MessageFlags.None);
+        writer.WriteString(@interface);
+        writer.WriteString(name);
+        writer.WriteVariantString(value);
+        return connection.CallMethodAsync(writer.CreateMessage());
+    }
+
     /// <summary>GattCharacteristic1.WriteValue; <paramref name="type"/> is "request" or "command".</summary>
     public Task WriteValueAsync(string characteristicPath, byte[] value, string type)
     {
