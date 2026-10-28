@@ -68,15 +68,30 @@
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                             <VerticalStackLayout VerticalOptions="Center">
+                                <Label Text="Address" />
+                                <Label Text="{Binding McpAddress}" Style="{StaticResource SecondaryText}" LineBreakMode="MiddleTruncation" />
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1" Text="Copy" Command="{Binding CopyMcpAddressCommand}" Style="{StaticResource QuietButton}" VerticalOptions="Center" WidthRequest="96" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout VerticalOptions="Center">
+                                <Label Text="Header" />
+                                <!-- The token stays hidden; Copy gives the real header. -->
+                                <Label Text="Authorization: Bearer ••••••••" Style="{StaticResource SecondaryText}" LineBreakMode="TailTruncation" />
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1" Text="Copy" Command="{Binding CopyMcpHeaderCommand}" Style="{StaticResource QuietButton}" VerticalOptions="Center" WidthRequest="96" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout VerticalOptions="Center">
                                 <Label Text="Token" />
                                 <Label Text="Assistants need it to connect. Replace it to cut off ones you've set up." Style="{StaticResource SecondaryText}" />
                             </VerticalStackLayout>
-                            <Button Grid.Column="1" Text="Replace" Command="{Binding NewMcpTokenCommand}" Style="{StaticResource QuietButton}" VerticalOptions="Center" />
+                            <Button Grid.Column="1" Text="Replace" Command="{Binding NewMcpTokenCommand}" Style="{StaticResource QuietButton}" VerticalOptions="Center" WidthRequest="96" />
                         </Grid>
-                        <Button Text="Copy Claude Code command" Command="{Binding CopyMcpCommandCommand}" Style="{StaticResource QuietButton}" />
+                        <Button Text="Copy setup for…" Command="{Binding CopyMcpSetupCommand}" />
                     </VerticalStackLayout>
                 </Border>
-                <Label Text="Runs a Model Context Protocol (MCP) server on this computer, so an assistant such as Claude can read the meter, see recent readings, press its buttons and save sessions. Only programs on this computer that have the token can use it."
+                <Label Text="Runs a Model Context Protocol (MCP) server on this computer, so an assistant such as Claude can read the meter, see recent readings, press its buttons and save sessions. Only programs on this computer that have the token can use it. Copy setup for… has ready-made setups for Claude Code, Claude Desktop, VS Code and Cursor; other MCP clients need the address and the header."
                        Style="{StaticResource SecondaryText}" />
             </VerticalStackLayout>
 

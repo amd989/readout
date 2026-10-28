@@ -28,6 +28,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _session = session;
         _mcpEnabled = settings.McpEnabled;
         _mcpPort = settings.McpPort.ToString(CultureInfo.InvariantCulture);
+        settings.Changed += (_, _) => OnPropertyChanged(nameof(McpAddress));
         _autoReconnect = settings.AutoReconnect;
         _continuitySound = settings.ContinuitySound;
         _continuityVibration = settings.ContinuityVibration;
@@ -80,17 +81,49 @@ public sealed partial class SettingsViewModel : ObservableObject
             _settings.McpPort = port;
     }
 
+    /// <summary>The server's address, for clients set up by hand.</summary>
+    public string McpAddress => $"http://127.0.0.1:{_settings.McpPort}/mcp";
+
+    [RelayCommand]
+    private Task CopyMcpAddressAsync() => CopyAsync(McpAddress, "The server's address is on the clipboard.");
+
+    [RelayCommand]
+    private Task CopyMcpHeaderAsync() => CopyAsync($"Authorization: Bearer {_settings.McpToken}",
+        "The header, with the token, is on the clipboard. Treat it like a password.");
+
+    /// <summary>Asks which assistant, then copies the setup it needs.</summary>
     [RelayCommand]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822", Justification = "Uses the settings on desktop; does nothing on phones, where the section is hidden.")]
-    private async Task CopyMcpCommandAsync()
+    private async Task CopyMcpSetupAsync()
     {
 #if MACCATALYST || WINDOWS
-        await Clipboard.Default.SetTextAsync(Readout.Mcp.McpSetup.ClaudeCodeCommand(_settings.McpPort, _settings.McpToken));
-        await Shell.Current.CurrentPage.DisplayAlertAsync("Copied",
-            "Paste it in a terminal to add Readout to Claude Code. It includes the token, so treat it like a password.", "OK");
+        var choices = new (string Title, Readout.Mcp.McpClientKind Kind, string Where)[]
+        {
+            ("Claude Code", Readout.Mcp.McpClientKind.ClaudeCode,
+                "Paste it in a terminal, then start a new Claude Code session."),
+            ("Claude Desktop", Readout.Mcp.McpClientKind.ClaudeDesktop,
+                "In Claude Desktop, open Settings → Developer → Edit Config and add it to claude_desktop_config.json (merge it with any servers already there), then quit and reopen Claude. It needs Node.js."),
+            ("VS Code", Readout.Mcp.McpClientKind.VsCode,
+                "In VS Code, run \"MCP: Open User Configuration\" and add it to mcp.json (merge it with any servers already there)."),
+            ("Cursor", Readout.Mcp.McpClientKind.Cursor,
+                "Add it to ~/.cursor/mcp.json (merge it with any servers already there), then restart Cursor."),
+        };
+        var picked = await Shell.Current.CurrentPage.DisplayActionSheetAsync(
+            "Copy setup for", "Cancel", null, [.. choices.Select(c => c.Title)]);
+        var choice = choices.FirstOrDefault(c => c.Title == picked);
+        if (choice.Title is null) return;
+
+        await CopyAsync(Readout.Mcp.McpSetup.For(choice.Kind, _settings.McpPort, _settings.McpToken),
+            $"{choice.Where} It includes the token, so treat it like a password.");
 #else
         await Task.CompletedTask;
 #endif
+    }
+
+    private static async Task CopyAsync(string text, string message)
+    {
+        await Clipboard.Default.SetTextAsync(text);
+        await Shell.Current.CurrentPage.DisplayAlertAsync("Copied", message, "OK");
     }
 
     [RelayCommand]

@@ -28,7 +28,7 @@ public sealed class McpHost : IDisposable
         settings.Changed += (_, _) => _ = ApplyAsync();
     }
 
-    /// <summary>"Off", "Listening on …" or why it couldn't start.</summary>
+    /// <summary>"Off", "Running" or why it couldn't start.</summary>
     public string Status { get; private set; } = "Off";
     public bool IsRunning => _server.IsRunning;
     public event EventHandler? StatusChanged;
@@ -69,7 +69,7 @@ public sealed class McpHost : IDisposable
                 // Off the main thread: starting a listener can block, and the window mustn't.
                 var token = _settings.McpToken;
                 await Task.Run(() => _server.Start(wanted.McpPort, token));
-                SetStatus($"Listening on {_server.Endpoint}");
+                SetStatus("Running");
             }
             catch (SocketException ex)
             {

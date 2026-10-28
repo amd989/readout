@@ -256,10 +256,89 @@ public sealed class McpHttpServer(MeterTools tools, string version, ILoggerFacto
     }
 }
 
-/// <summary>Setting up a client to use the server.</summary>
+/// <summary>An MCP client the app can write setup text for.</summary>
+public enum McpClientKind
+{
+    ClaudeCode,
+    ClaudeDesktop,
+    VsCode,
+    Cursor,
+}
+
+/// <summary>What a client needs to use the server: the address, the header, or a ready-made setup.</summary>
 public static class McpSetup
 {
+    private const string ServerName = "readout";
+    // Readable for pasting: no \u escapes for characters like + or &.
+    private static readonly System.Text.Json.JsonSerializerOptions Indented = new()
+    {
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    public static string Address(int port) => $"http://{McpHttpServer.Host}:{port}{McpHttpServer.EndpointPath}";
+
+    public static string AuthorizationHeader(string token) => $"Authorization: Bearer {token}";
+
+    /// <summary>The text to paste into <paramref name="client"/>'s setup.</summary>
+    public static string For(McpClientKind client, int port, string token) => client switch
+    {
+        McpClientKind.ClaudeCode => ClaudeCodeCommand(port, token),
+        McpClientKind.ClaudeDesktop => ClaudeDesktopConfig(port, token),
+        McpClientKind.VsCode => VsCodeConfig(port, token),
+        McpClientKind.Cursor => CursorConfig(port, token),
+        _ => throw new ArgumentOutOfRangeException(nameof(client)),
+    };
+
     /// <summary>The command that adds the server to Claude Code.</summary>
     public static string ClaudeCodeCommand(int port, string token) =>
-        $"claude mcp add --transport http readout http://{McpHttpServer.Host}:{port}{McpHttpServer.EndpointPath} --header \"Authorization: Bearer {token}\"";
+        $"claude mcp add --transport http {ServerName} {Address(port)} --header \"{AuthorizationHeader(token)}\"";
+
+    /// <summary>
+    /// For claude_desktop_config.json. Claude Desktop starts local servers as programs, so it
+    /// connects through mcp-remote; the token goes in an environment variable because on
+    /// Windows a space inside an argument splits it.
+    /// </summary>
+    public static string ClaudeDesktopConfig(int port, string token) => Json(new System.Text.Json.Nodes.JsonObject
+    {
+        ["mcpServers"] = new System.Text.Json.Nodes.JsonObject
+        {
+            [ServerName] = new System.Text.Json.Nodes.JsonObject
+            {
+                ["command"] = "npx",
+                ["args"] = new System.Text.Json.Nodes.JsonArray(
+                    "mcp-remote@latest", Address(port), "--allow-http", "--header", "Authorization:${READOUT_AUTH}"),
+                ["env"] = new System.Text.Json.Nodes.JsonObject { ["READOUT_AUTH"] = $"Bearer {token}" },
+            },
+        },
+    });
+
+    /// <summary>For VS Code's mcp.json (MCP: Open User Configuration).</summary>
+    public static string VsCodeConfig(int port, string token) => Json(new System.Text.Json.Nodes.JsonObject
+    {
+        ["servers"] = new System.Text.Json.Nodes.JsonObject
+        {
+            [ServerName] = new System.Text.Json.Nodes.JsonObject
+            {
+                ["type"] = "http",
+                ["url"] = Address(port),
+                ["headers"] = new System.Text.Json.Nodes.JsonObject { ["Authorization"] = $"Bearer {token}" },
+            },
+        },
+    });
+
+    /// <summary>For Cursor's ~/.cursor/mcp.json.</summary>
+    public static string CursorConfig(int port, string token) => Json(new System.Text.Json.Nodes.JsonObject
+    {
+        ["mcpServers"] = new System.Text.Json.Nodes.JsonObject
+        {
+            [ServerName] = new System.Text.Json.Nodes.JsonObject
+            {
+                ["url"] = Address(port),
+                ["headers"] = new System.Text.Json.Nodes.JsonObject { ["Authorization"] = $"Bearer {token}" },
+            },
+        },
+    });
+
+    private static string Json(System.Text.Json.Nodes.JsonObject value) => value.ToJsonString(Indented);
 }

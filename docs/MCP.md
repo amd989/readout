@@ -7,19 +7,81 @@ readings, press its buttons and save sessions. It's off until you turn it on.
 ## Turn it on
 
 1. Connect your meter in Readout (or try the demo meter).
-2. **Settings → AI assistants → Let AI assistants use the meter.** The status line shows
-   `Listening on http://127.0.0.1:47121/mcp`.
-3. Tap **Copy Claude Code command** and paste it in a terminal. It looks like:
+2. **Settings → AI assistants → Let AI assistants use the meter.** The status says *Running*.
+3. Tap **Copy setup for…** and pick your assistant. The app copies the setup text and says
+   where to paste it. Everything it copies includes the token, so treat it like a password.
 
-   ```bash
-   claude mcp add --transport http readout http://127.0.0.1:47121/mcp --header "Authorization: Bearer <token>"
-   ```
+Then ask, for example, "What's the meter reading?" or "Log the supply voltage for a minute and
+tell me how much it ripples."
 
-4. Start a new Claude Code session and ask, for example, "What's the meter reading?" or
-   "Log the supply voltage for a minute and tell me how much it ripples."
+### Claude Code
 
-Other MCP clients work too: point them at `http://127.0.0.1:47121/mcp` (Streamable HTTP)
-with the header `Authorization: Bearer <token>`.
+The copied command:
+
+```bash
+claude mcp add --transport http readout http://127.0.0.1:47121/mcp --header "Authorization: Bearer <token>"
+```
+
+Run it in a terminal, then start a new Claude Code session.
+
+### Claude Desktop
+
+Claude Desktop starts local servers as programs, so it reaches Readout through
+[`mcp-remote`](https://www.npmjs.com/package/mcp-remote), which needs [Node.js](https://nodejs.org).
+Open **Settings → Developer → Edit Config** and add the copied block to `claude_desktop_config.json`
+(merge it into `mcpServers` if there are others), then quit and reopen Claude:
+
+```json
+{
+  "mcpServers": {
+    "readout": {
+      "command": "npx",
+      "args": ["mcp-remote@latest", "http://127.0.0.1:47121/mcp", "--allow-http", "--header", "Authorization:${READOUT_AUTH}"],
+      "env": { "READOUT_AUTH": "Bearer <token>" }
+    }
+  }
+}
+```
+
+The token is in `env` because on Windows a space inside an argument splits it.
+
+### VS Code (GitHub Copilot)
+
+Run **MCP: Open User Configuration** and add the copied block to `mcp.json`:
+
+```json
+{
+  "servers": {
+    "readout": {
+      "type": "http",
+      "url": "http://127.0.0.1:47121/mcp",
+      "headers": { "Authorization": "Bearer <token>" }
+    }
+  }
+}
+```
+
+### Cursor
+
+Add the copied block to `~/.cursor/mcp.json`, then restart Cursor:
+
+```json
+{
+  "mcpServers": {
+    "readout": {
+      "url": "http://127.0.0.1:47121/mcp",
+      "headers": { "Authorization": "Bearer <token>" }
+    }
+  }
+}
+```
+
+### Anything else
+
+Any MCP client that runs on the same computer and speaks Streamable HTTP can connect: Settings
+has **Copy** buttons for the address (`http://127.0.0.1:47121/mcp`) and the header
+(`Authorization: Bearer <token>`). Web-based assistants (claude.ai, ChatGPT in a browser) can't:
+they run on remote servers, which can't reach 127.0.0.1 on your computer.
 
 ## Tools
 

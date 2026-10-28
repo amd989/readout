@@ -289,6 +289,30 @@ public sealed class McpServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public void SetupText_ForEachClient_HasTheAddressAndToken()
+    {
+        var address = $"http://{McpHttpServer.Host}:47121/mcp";
+
+        var vsCode = JsonDocument.Parse(McpSetup.For(McpClientKind.VsCode, 47121, "abc")).RootElement.GetProperty("servers").GetProperty("readout");
+        Assert.Equal("http", vsCode.GetProperty("type").GetString());
+        Assert.Equal(address, vsCode.GetProperty("url").GetString());
+        Assert.Equal("Bearer abc", vsCode.GetProperty("headers").GetProperty("Authorization").GetString());
+
+        var cursor = JsonDocument.Parse(McpSetup.For(McpClientKind.Cursor, 47121, "abc")).RootElement.GetProperty("mcpServers").GetProperty("readout");
+        Assert.Equal(address, cursor.GetProperty("url").GetString());
+        Assert.Equal("Bearer abc", cursor.GetProperty("headers").GetProperty("Authorization").GetString());
+
+        var desktop = JsonDocument.Parse(McpSetup.For(McpClientKind.ClaudeDesktop, 47121, "abc")).RootElement.GetProperty("mcpServers").GetProperty("readout");
+        Assert.Equal("npx", desktop.GetProperty("command").GetString());
+        Assert.Equal(["mcp-remote@latest", address, "--allow-http", "--header", "Authorization:${READOUT_AUTH}"],
+            desktop.GetProperty("args").EnumerateArray().Select(a => a.GetString()));
+        Assert.Equal("Bearer abc", desktop.GetProperty("env").GetProperty("READOUT_AUTH").GetString());
+
+        Assert.Equal(address, McpSetup.Address(47121));
+        Assert.Equal("Authorization: Bearer abc", McpSetup.AuthorizationHeader("abc"));
+    }
+
+    [Fact]
     public void ClaudeCodeCommand_HasTheEndpointAndToken() =>
         Assert.Equal(
             $"claude mcp add --transport http readout http://{McpHttpServer.Host}:47121/mcp --header \"Authorization: Bearer abc\"",
