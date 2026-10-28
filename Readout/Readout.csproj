@@ -60,6 +60,11 @@
 
 		<!-- Images (tab icons) -->
 		<MauiImage Include="Resources\Images\*" />
+		<!-- Windows draws tab icons in a 16x16 box. The 24-unit icons above blur at that size
+		     (1.2px lines between pixel rows), so Windows gets its own set drawn on a 16px grid
+		     with 1px lines on whole pixels. -->
+		<MauiImage Remove="Resources\Images\tab_*.svg" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
+		<MauiImage Include="Resources\Images\Windows\*" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
 
 		<!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
