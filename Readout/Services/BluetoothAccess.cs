@@ -3,13 +3,17 @@ using Plugin.BLE.Abstractions.Contracts;
 namespace Readout.Services;
 
 /// <summary>Asks for the Bluetooth permission where the OS needs it, and explains what's missing.</summary>
-/// <param name="ble">The radio; null when the simulated transport stands in for it (simulators).</param>
-public sealed class BluetoothAccess(Func<IBluetoothLE>? ble)
+/// <param name="state">
+/// The radio's state (Plugin.BLE's, or BlueZ's on Linux), asked for only when needed: on Apple
+/// platforms that's what shows the permission prompt. Null when the simulated transport stands
+/// in for the radio (simulators).
+/// </param>
+public sealed class BluetoothAccess(Func<Task<BluetoothState>>? state)
 {
     /// <summary>Null when scanning can start; otherwise what the user should do.</summary>
     public async Task<string?> EnsureReadyAsync()
     {
-        if (ble is null) return null;
+        if (state is null) return null;
 #if ANDROID
         var status = await MainThread.InvokeOnMainThreadAsync(Permissions.RequestAsync<NearbyDevices>);
         if (status != PermissionStatus.Granted)
@@ -18,14 +22,22 @@ public sealed class BluetoothAccess(Func<IBluetoothLE>? ble)
         // The radio reports Unknown until the OS answers: for a moment after launch, and for as
         // long as the Bluetooth permission prompt is up (a new Mac build asks again). Wait that
         // out rather than give up, which would leave auto-connect not trying at all.
-        for (var waited = 0; waited < 30_000 && ble().State is BluetoothState.Unknown or BluetoothState.TurningOn; waited += 100)
+        var current = await state();
+        for (var waited = 0; waited < 30_000 && current is BluetoothState.Unknown or BluetoothState.TurningOn; waited += 100)
+        {
             await Task.Delay(100);
+            current = await state();
+        }
 
-        return ble().State switch
+        return current switch
         {
             BluetoothState.On => null,
             BluetoothState.Unauthorized => "Readout isn't allowed to use Bluetooth. You can allow it in Settings.",
+#if LINUX
+            BluetoothState.Unavailable => "No Bluetooth adapter found. Readout needs BlueZ running and an adapter with Bluetooth Low Energy.",
+#else
             BluetoothState.Unavailable => "This device doesn't support Bluetooth Low Energy.",
+#endif
             BluetoothState.Off or BluetoothState.TurningOff => "Bluetooth is off. Turn it on to find your meter.",
             _ => "Bluetooth isn't ready yet. Try again in a moment.",
         };

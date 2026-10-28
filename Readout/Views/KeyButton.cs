@@ -21,6 +21,7 @@ public sealed class KeyButton : Button
         BindableProperty.Create(nameof(Key), typeof(MeterKey), typeof(KeyButton), MeterKey.Mode);
 
     private IDispatcherTimer? _timer;
+    private bool _down;
     private bool _longSent;
 
     public KeyButton()
@@ -41,6 +42,7 @@ public sealed class KeyButton : Button
     private void OnPressed(object? sender, EventArgs e)
     {
         Haptic(HapticFeedbackType.Click);
+        _down = true;
         _longSent = false;
         _timer ??= CreateTimer();
         _timer.Start();
@@ -48,9 +50,23 @@ public sealed class KeyButton : Button
 
     private void OnReleased(object? sender, EventArgs e)
     {
+        _down = false;
+        // Once the long press went, the one-shot timer has fired and there's nothing to stop.
+        if (_longSent) return;
         _timer?.Stop();
-        if (!_longSent)
-            KeyPressed?.Invoke(this, new KeyPressedEventArgs(Key, longPress: false));
+        KeyPressed?.Invoke(this, new KeyPressedEventArgs(Key, longPress: false));
+    }
+
+    /// <summary>
+    /// Drops a press without sending anything. The Linux head calls this when the pointer is let
+    /// go off the button, where GTK raises no Released, so the long press doesn't fire by itself.
+    /// </summary>
+    public void CancelPress()
+    {
+        if (!_down) return;
+        _down = false;
+        if (!_longSent) _timer?.Stop();
+        _longSent = true;
     }
 
     /// <summary>

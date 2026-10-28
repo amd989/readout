@@ -15,24 +15,41 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
+#if LINUX
+        // Microsoft's GTK4 backend (the Readout.Linux head), and its Essentials (Preferences,
+        // FileSystem, Clipboard, Launcher…).
+        Microsoft.Maui.Platforms.Linux.Gtk4.Hosting.AppHostBuilderExtensions.UseMauiAppLinuxGtk4<App>(builder);
+        Microsoft.Maui.Platforms.Linux.Gtk4.Essentials.Hosting.EssentialsHostBuilderExtensions.AddLinuxGtk4Essentials(builder);
+#else
+        builder.UseMauiApp<App>();
+#endif
         builder
-            .UseMauiApp<App>()
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
+        var fakeBluetooth = UseFakeBluetooth();
+#if LINUX
+        // Bluetooth: BlueZ over D-Bus (Plugin.BLE has no Linux backend).
+        builder.Services.AddSingleton<Readout.Linux.BlueZ.BlueZBus>();
+        builder.Services.AddSingleton<Readout.Linux.BlueZ.BlueZMeterConnection>();
+        builder.Services.AddSingleton(sp => new BluetoothAccess(fakeBluetooth
+            ? null
+            : sp.GetRequiredService<Readout.Linux.BlueZ.BlueZMeterConnection>().GetBluetoothStateAsync));
+#else
         // Bluetooth: Plugin.BLE, created lazily (reading Current starts the platform's manager,
         // which on Apple platforms is what shows the permission prompt).
         builder.Services.AddSingleton<IBluetoothLE>(_ => Plugin.BLE.CrossBluetoothLE.Current);
+        builder.Services.AddSingleton(sp => new BluetoothAccess(fakeBluetooth
+            ? null
+            : () => Task.FromResult(sp.GetRequiredService<IBluetoothLE>().State)));
+#endif
         builder.Services.AddSingleton<SimulatedMeterConnection>();
         builder.Services.AddSingleton(_ => new AppSettings(Preferences.Default));
         builder.Services.AddSingleton<IContinuityTone, ContinuityTone>();
         builder.Services.AddSingleton<ContinuityFeedback>();
-        var fakeBluetooth = UseFakeBluetooth();
-        builder.Services.AddSingleton(sp => new BluetoothAccess(
-            fakeBluetooth ? null : sp.GetRequiredService<IBluetoothLE>));
 
         builder.Services.AddSingleton(sp =>
         {
@@ -41,11 +58,15 @@ public static class MauiProgram
             // meter when they scan (also anywhere with READOUT_FAKE_BLE=1).
             IMeterConnection bluetooth = fakeBluetooth
                 ? new SimulatedMeterConnection()
+#if LINUX
+                : sp.GetRequiredService<Readout.Linux.BlueZ.BlueZMeterConnection>();
+#else
                 : ActivatorUtilities.CreateInstance<BleMeterConnection>(sp);
+#endif
 
             var session = new MeterSession(bluetooth, demo)
             {
-                Dispatch = MainThread.BeginInvokeOnMainThread,
+                Dispatch = UiThread.Post,
                 PreferredMeterId = Preferences.Default.Get<string?>(PreferredMeterKey, null),
                 AutoReconnect = sp.GetRequiredService<AppSettings>().AutoReconnect,
             };
@@ -59,7 +80,7 @@ public static class MauiProgram
             sp.GetRequiredService<MeterSession>().Log,
             Path.Combine(FileSystem.AppDataDirectory, "recording.csv")));
 
-#if MACCATALYST || WINDOWS
+#if MACCATALYST || WINDOWS || LINUX
         // The MCP server for AI assistants, while it's on in Settings.
         builder.Services.AddSingleton<McpHost>();
 #endif
@@ -117,13 +138,19 @@ public static class MauiProgram
         });
 #endif
 
+#if LINUX
+        // Run from a terminal, the app says what it's doing (the Bluetooth steps especially).
+        builder.Logging.AddSimpleConsole(o => { o.SingleLine = true; o.TimestampFormat = "HH:mm:ss "; });
+        builder.Logging.AddFilter<Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider>(null, LogLevel.Warning);
+        builder.Logging.AddFilter<Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider>("Readout", LogLevel.Information);
+#endif
 #if DEBUG
         builder.Logging.AddDebug();
         builder.Logging.SetMinimumLevel(LogLevel.Debug);
 #endif
 
         var app = builder.Build();
-#if MACCATALYST || WINDOWS
+#if MACCATALYST || WINDOWS || LINUX
         _ = app.Services.GetRequiredService<McpHost>().ApplyAsync();
 #endif
         return app;
@@ -131,7 +158,10 @@ public static class MauiProgram
 
     private static bool UseFakeBluetooth()
     {
-#if DEBUG
+#if LINUX
+        // In Release too, so the published app can be tried without a meter or a radio.
+        return Environment.GetEnvironmentVariable("READOUT_FAKE_BLE") == "1";
+#elif DEBUG
         return DeviceInfo.Current.DeviceType == DeviceType.Virtual
             || Environment.GetEnvironmentVariable("READOUT_FAKE_BLE") == "1";
 #else
