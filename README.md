@@ -95,6 +95,11 @@ meter when you scan (set `READOUT_FAKE_BLE=1` to do that anywhere). Every build 
 slice other than arm64, which App Store Connect rejects. `./publish-mac.sh` builds the signed
 Mac App Store `.pkg` (Apple silicon and Intel). Upload with Transporter.
 
+`./publish-windows.ps1` builds the Microsoft Store packages: an unsigned `.msix` each for x64
+and arm64 in `artifacts/windows` (the Store signs them). Release Windows builds are MSIX; Debug
+builds stay a plain `.exe`. `-Test -Install` builds and installs a local test copy (Developer
+Mode), and `-Wack` also runs the Windows App Certification Kit from an administrator shell.
+
 <img src="docs/screenshots/mac-meter.png" width="820" alt="The Mac app with the meter and a wide graph">
 
 ## Linux

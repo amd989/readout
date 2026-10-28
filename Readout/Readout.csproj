@@ -24,8 +24,10 @@
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 
-		<!-- Unpackaged on Windows: a plain .exe. -->
-		<WindowsPackageType>None</WindowsPackageType>
+		<!-- Windows: Debug is a plain .exe (quick to run); Release is an MSIX package for the
+		     Microsoft Store (see publish-windows.ps1). -->
+		<WindowsPackageType Condition="'$(Configuration)' != 'Release'">None</WindowsPackageType>
+		<WindowsPackageType Condition="'$(Configuration)' == 'Release'">MSIX</WindowsPackageType>
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
@@ -40,6 +42,13 @@
 	<!-- The Mac App Store needs both architectures. -->
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst' and '$(Configuration)' == 'Release'">
 		<RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers>
+	</PropertyGroup>
+
+	<!-- Windows builds for this PC's architecture unless WindowsRuntimeIdentifier says otherwise
+	     (publish-windows.ps1 builds win-x64 and win-arm64). Not -r: that would apply to every
+	     target framework, Android included. -->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' and '$(WindowsRuntimeIdentifier)' != ''">
+		<RuntimeIdentifier>$(WindowsRuntimeIdentifier)</RuntimeIdentifier>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -2,22 +2,24 @@
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap rescap">
 
-  <Identity Name="maui-package-name-placeholder" Publisher="CN=User Name" Version="0.0.0.0" />
-
-  <mp:PhoneIdentity PhoneProductId="C3BB02D0-B9B0-4510-809B-62AE47B952C9" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+  <!-- Name, Publisher and PublisherDisplayName must match Partner Center > the app >
+       Product identity exactly, or the Store rejects the upload. publish-windows.ps1 refuses
+       to build a Store package while these are still placeholders.
+       Version is filled in at build time from ApplicationDisplayVersion and ApplicationVersion. -->
+  <Identity Name="PARTNER-CENTER-PACKAGE-NAME" Publisher="CN=PARTNER-CENTER-PUBLISHER-ID" Version="0.0.0.0" />
 
   <Properties>
     <DisplayName>$placeholder$</DisplayName>
-    <PublisherDisplayName>User Name</PublisherDisplayName>
+    <PublisherDisplayName>Alejandro Mora</PublisherDisplayName>
     <Logo>$placeholder$.png</Logo>
   </Properties>
 
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+    <!-- Desktop only (a WinUI 3 app; no Xbox or HoloLens). The build sets MaxVersionTested
+         from the target framework's Windows version. -->
     <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
   </Dependencies>
 
@@ -29,7 +31,7 @@
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="$targetentrypoint$">
       <uap:VisualElements
         DisplayName="$placeholder$"
-        Description="$placeholder$"
+        Description="Companion app for the EEVblog 121GW multimeter over Bluetooth LE."
         Square150x150Logo="$placeholder$.png"
         Square44x44Logo="$placeholder$.png"
         BackgroundColor="transparent">
@@ -40,7 +42,10 @@
   </Applications>
 
   <Capabilities>
+    <!-- A desktop (WinUI 3) app; Partner Center asks for a one-line reason for this one. -->
     <rescap:Capability Name="runFullTrust" />
+    <!-- The 121GW, through Plugin.BLE. -->
+    <DeviceCapability Name="bluetooth" />
   </Capabilities>
 
 </Package>

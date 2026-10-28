@@ -29,6 +29,7 @@ dotnet build Readout -f net10.0-android
 ./deploy-mac.sh        # build and launch the Mac app (--log follows its output)
 ./publish-ios.sh       # Release .ipa for TestFlight / App Store (fails on any non-arm64 slice)
 ./publish-mac.sh       # Release .pkg for the Mac App Store (universal, sandboxed)
+./publish-windows.ps1  # Release .msix (x64 + arm64) for the Microsoft Store; -Test -Install for a local copy
 ```
 
 ## Things to know
@@ -40,4 +41,5 @@ dotnet build Readout -f net10.0-android
 - After editing an `Info.plist`, build with `-t:Rebuild`: an incremental build can keep a stale compiled plist.
 - `docs/` is also the GitHub Pages site (plain HTML and `style.css`; `.nojekyll`). The App Store listing's support, marketing and privacy URLs point at it, so keep `privacy.html` in step with `PRIVACY.md`. `store/screenshots/` has the full-size App Store screenshots: iPhone medium display 1206x2622 (the size App Store Connect requires), iPhone large display 1320x2868, iPad 13", Mac 2880x1800, all without an alpha channel. The listing text and submission checklist (`store/*.md`) are kept local and git-ignored; `docs/screenshots/` has smaller copies for the web.
 - The Mac app's sandbox container is tied to the signature that first used it. A build signed with a different certificate (Release vs Debug, TestFlight) hangs at launch in `_libsecinit_appsandbox`, with no window, until the user answers macOS's access prompt; scripts can't read the container meanwhile ("Operation not permitted").
+- Windows: Debug builds are unpackaged (plain .exe); Release builds are MSIX. The architecture comes from `WindowsRuntimeIdentifier`, not `-r` (which would apply to Android too). The Store needs the version's last part to be 0, so `publish-windows.ps1` passes `ApplicationDisplayVersion=major.minor.build` and `ApplicationVersion=0` (MAUI puts `ApplicationVersion` last). The package identity in `Platforms/Windows/Package.appxmanifest` must match Partner Center's Product identity.
 - App Store Connect rejects any x86_64 slice in an iPhone build (ITMS-90087; Wavelength hit it through SkiaSharp). `publish-ios.sh` checks every binary in the .ipa; if a new package brings a fat framework, strip it before signing as Wavelength's `_ThinFrameworksForDevice` does.
