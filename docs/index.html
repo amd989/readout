@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Readout: a companion app for the EEVblog 121GW</title>
+  <meta name="description" content="See your EEVblog 121GW multimeter's display live on iPhone, iPad, Mac and Android. Press its buttons remotely, log readings, save sessions and export CSV.">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <meta property="og:title" content="Readout">
+  <meta property="og:description" content="A companion app for the EEVblog 121GW multimeter.">
+  <meta property="og:image" content="screenshots/ipad-landscape.png">
+</head>
+<body>
+  <header>
+    <nav>
+      <a class="brand" href="./"><img src="icon.svg" alt="">Readout</a>
+      <div class="links">
+        <a href="#features">Features</a>
+        <a href="#screenshots">Screenshots</a>
+        <a href="support.html">Support</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="https://github.com/amd989/readout">GitHub</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div>
+        <h1>Your 121GW, on every screen.</h1>
+        <p class="lead">Readout connects to the EEVblog 121GW multimeter over Bluetooth and shows its
+          display live on your iPhone, iPad or Mac. Press its buttons from across the bench, log every
+          reading and keep the graphs.</p>
+        <div class="cta">
+          <a class="button primary" href="https://github.com/amd989/readout">Get it on GitHub</a>
+          <a class="button secondary" href="https://www.eevblog.com/product/121gw/">About the 121GW</a>
+        </div>
+        <p class="note">Coming to the App Store. Free and open source (MIT).</p>
+      </div>
+      <img class="shot phone" src="screenshots/iphone-meter.png" width="440" height="956"
+           alt="Readout on an iPhone: the 121GW's LCD reading 12.324 V, the meter's buttons, and a live graph of the readings">
+    </div>
+
+    <section id="features">
+      <h2>What it does</h2>
+      <p>Everything you'd want from a meter's app, and nothing you didn't ask for.</p>
+      <div class="features">
+        <div class="feature"><h3>Live display</h3><p>A faithful drawing of the 121GW's LCD: main and secondary readings, units, the bar graph and every symbol.</p></div>
+        <div class="feature"><h3>Remote buttons</h3><p>All eight buttons, labeled as on the meter. Tap for a short press, hold for a long one.</p></div>
+        <div class="feature"><h3>Logging and graphs</h3><p>Every reading is logged while connected, with min, max, average and peak-to-peak. Pinch to zoom.</p></div>
+        <div class="feature"><h3>Saved sessions</h3><p>Name a recording, add notes, and export it as CSV in SI units for a spreadsheet.</p></div>
+        <div class="feature"><h3>Continuity beep</h3><p>Your phone beeps and buzzes below a threshold you choose, with no chatter.</p></div>
+        <div class="feature"><h3>Works with Claude</h3><p>On the Mac, an optional local MCP server lets an AI assistant read the meter. <a href="https://github.com/amd989/readout/blob/main/docs/MCP.md">How it works</a>.</p></div>
+        <div class="feature"><h3>Demo meter</h3><p>No meter at hand? A simulated one shows every feature.</p></div>
+        <div class="feature"><h3>Private</h3><p>No account, no analytics, no tracking. Readings stay on your device.</p></div>
+      </div>
+    </section>
+
+    <section id="screenshots">
+      <h2>Screenshots</h2>
+      <p>Light and dark, portrait and landscape, phone, tablet and desktop.</p>
+      <div class="gallery">
+        <img class="shot" src="screenshots/iphone-meter.png" width="440" height="956" alt="Live DC voltage reading with a graph">
+        <img class="shot" src="screenshots/iphone-ac-dark.png" width="440" height="956" alt="AC voltage and frequency in dark mode">
+        <img class="shot" src="screenshots/iphone-session.png" width="440" height="956" alt="A saved battery discharge session with its graph and statistics">
+        <img class="shot" src="screenshots/iphone-sessions.png" width="440" height="956" alt="The list of saved sessions">
+      </div>
+      <div class="wide" style="margin-top:22px">
+        <img class="shot" src="screenshots/ipad-landscape.png" width="1376" height="1032" alt="iPad in landscape: the meter in a side column and a large graph">
+        <img class="shot" src="screenshots/mac-meter.png" width="1440" height="900" alt="The Mac app with the meter and a wide graph">
+        <img class="shot" src="screenshots/mac-ai-assistants.png" width="1440" height="900" alt="Mac settings for letting AI assistants use the meter">
+      </div>
+    </section>
+
+    <section id="links">
+      <h2>Links</h2>
+      <ul class="links-list">
+        <li><a href="https://www.eevblog.com/product/121gw/">EEVblog 121GW</a><span>The meter, from the EEVblog store</span></li>
+        <li><a href="https://www.eevblog.com/product/121gw/">121GW manual</a><span>Linked from the product page, with firmware updates</span></li>
+        <li><a href="https://github.com/amd989/readout">Source code</a><span>The whole app, MIT licensed</span></li>
+        <li><a href="https://github.com/amd989/readout/blob/main/docs/PROTOCOL.md">Bluetooth protocol</a><span>How the 121GW talks, documented</span></li>
+        <li><a href="https://github.com/amd989/readout/blob/main/docs/MCP.md">Using it with Claude</a><span>Setup for Claude Code, Claude Desktop, VS Code and Cursor</span></li>
+        <li><a href="support.html">Support</a><span>Questions, connection help, bug reports</span></li>
+        <li><a href="privacy.html">Privacy policy</a><span>No data collected</span></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>Readout is an independent, open-source project. It is not made, endorsed or supported by EEVblog.
+      121GW and EEVblog are trademarks of their owners and are used here only to say which meter the app works with.</p>
+    <p>The meter protocol comes from the official EEVblog 121GW app by David Ledger (MIT).
+      © 2026 Alejandro Mora. <a href="https://github.com/amd989/readout/blob/main/LICENSE">MIT License</a>.</p>
+  </footer>
+</body>
+</html>

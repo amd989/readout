@@ -16,4 +16,4 @@ Readout does not collect, store on a server, share or sell any personal data.
   assistant and its own privacy policy.
 - **No accounts, analytics, ads or tracking.** The app makes no network connections of its own.
 
-Questions: open an issue at <https://github.com/amd989/121gw/issues>.
+Questions: open an issue at <https://github.com/amd989/readout/issues>.

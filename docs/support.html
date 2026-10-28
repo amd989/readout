@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Readout support</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <a class="brand" href="./"><img src="icon.svg" alt="">Readout</a>
+      <div class="links">
+        <a href="./">Home</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="https://github.com/amd989/readout">GitHub</a>
+      </div>
+    </nav>
+  </header>
+
+  <article>
+    <h1>Support</h1>
+    <p>Found a bug or have a question? <a href="https://github.com/amd989/readout/issues">Open an issue on GitHub</a>.
+      Please include your device, its OS version and the meter's firmware version (shown at power-on).</p>
+
+    <h2>The app doesn't find my meter</h2>
+    <ul>
+      <li>Turn on the meter's Bluetooth: <strong>hold 1ms PEAK</strong> until <code>BT</code> shows on the display.
+        Holding it again turns Bluetooth off.</li>
+      <li>Allow Readout to use Bluetooth: iPhone and iPad <em>Settings &gt; Readout</em>; Mac
+        <em>System Settings &gt; Privacy &amp; Security &gt; Bluetooth</em>.</li>
+      <li>Only one app can be connected to the meter at a time. Close the official EEVblog app or any
+        other app that might be connected.</li>
+      <li>Older meters may advertise as "Bluegiga" rather than "121GW". Readout finds both.</li>
+    </ul>
+
+    <h2>How do I measure AC, temperature, capacitance…?</h2>
+    <p>The dial picks the group, and <strong>MODE</strong> cycles within it, exactly as on the meter.
+      For example, V gives DC, AC and DC+AC; mV gives DC, AC and temperature; Ω gives resistance,
+      continuity, diode and capacitance. The app can press MODE for you but can't turn the dial.
+      The <a href="https://www.eevblog.com/product/121gw/">121GW manual</a> has the full list.</p>
+
+    <h2>Long presses</h2>
+    <p>Hold a button in the app for about a second for a long press. The small labels under the
+      buttons are what holding does: 1 kHz low-pass filter (REL, in AC) and Bluetooth (1ms PEAK).</p>
+
+    <h2>Getting my readings out</h2>
+    <p>Save the recording as a session, open it in the Sessions tab and tap <strong>Export CSV</strong>.
+      Times are in UTC and values in SI base units (V, A, Ω, Hz, F, °C).</p>
+
+    <h2>Using it with an AI assistant</h2>
+    <p>On the Mac, Settings &gt; AI assistants turns on a local MCP server.
+      <a href="https://github.com/amd989/readout/blob/main/docs/MCP.md">Setup for Claude Code, Claude Desktop, VS Code and Cursor</a>.</p>
+  </article>
+
+  <footer>
+    <p>Readout is an independent, open-source project, not made, endorsed or supported by EEVblog.</p>
+  </footer>
+</body>
+</html>

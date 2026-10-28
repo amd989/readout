@@ -27,5 +27,26 @@ dotnet publish "$PROJ" -f net10.0-ios -c Release \
   /p:CodesignProvision="$PROFILE" \
   /p:ApplicationVersion="$BUILD"
 
-echo "==> Done:"
-ls "$OUT"/*.ipa
+IPA="$(ls -t "$OUT"/*.ipa | head -1)"
+
+# App Store Connect rejects any simulator (x86_64) slice in an iPhone build (ITMS-90087,
+# with 90080, 90125 and 90209). Some NuGet packages ship fat native frameworks the SDK
+# doesn't thin (Wavelength's SkiaSharp did), so check every binary before uploading.
+echo "==> Checking that every binary in the .ipa is arm64 only..."
+UNPACKED="$(mktemp -d)"
+trap 'rm -rf "$UNPACKED"' EXIT
+unzip -q "$IPA" -d "$UNPACKED"
+BAD=""
+while IFS= read -r -d '' f; do
+  if file -b "$f" | grep -q "Mach-O"; then
+    ARCHS="$(lipo -archs "$f" 2>/dev/null)"
+    [ "$ARCHS" != "arm64" ] && BAD="$BAD\n  $ARCHS  ${f#"$UNPACKED"/Payload/}"
+  fi
+done < <(find "$UNPACKED/Payload" -type f -print0)
+if [ -n "$BAD" ]; then
+  echo -e "Not arm64 only, App Store Connect will reject it:$BAD" >&2
+  echo "Strip the extra slices (lipo -remove x86_64) before signing; see Wavelength's _ThinFrameworksForDevice." >&2
+  exit 1
+fi
+
+echo "==> Done: $IPA"

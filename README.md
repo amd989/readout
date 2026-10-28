@@ -3,6 +3,18 @@
 A companion app for the **EEVblog 121GW** multimeter, for iPhone, iPad, Mac, Android and
 Windows. Built with .NET 10 and .NET MAUI.
 
+**[Website](https://amd989.github.io/readout/)** · [Support](https://amd989.github.io/readout/support.html) ·
+[Privacy](https://amd989.github.io/readout/privacy.html) · [The 121GW](https://www.eevblog.com/product/121gw/)
+
+<p>
+  <img src="docs/screenshots/iphone-meter.png" width="200" alt="Live DC voltage reading with a graph">
+  <img src="docs/screenshots/iphone-ac-dark.png" width="200" alt="AC voltage and frequency in dark mode">
+  <img src="docs/screenshots/iphone-session.png" width="200" alt="A saved battery discharge session">
+  <img src="docs/screenshots/iphone-sessions.png" width="200" alt="The list of saved sessions">
+</p>
+
+<img src="docs/screenshots/ipad-landscape.png" width="820" alt="iPad in landscape: the meter in a side column and a large graph">
+
 - **Live LCD.** A drawing of the meter's display: main and sub readings, units, the bar graph
   and every symbol.
 - **Remote buttons.** Press any of the meter's eight buttons from the app, short or long.
@@ -47,6 +59,8 @@ Windows. Built with .NET 10 and .NET MAUI.
 | `Readout/` | The .NET MAUI app: Bluetooth through Plugin.BLE, view models, pages, the LCD and graph drawings. |
 | `Readout.Tests/` | xUnit tests for the core. |
 | `docs/PROTOCOL.md` | The 121GW Bluetooth protocol, documented. |
+| `docs/` | Also the GitHub Pages site (`index.html`, `privacy.html`, `support.html`) and the web screenshots. |
+| `store/` | App Store listing text, the submission checklist and full-size screenshots. |
 
 ## Building
 
@@ -74,6 +88,15 @@ On Windows, `-f net10.0-windows10.0.19041.0`.
 Simulators and emulators have no Bluetooth. Debug builds running on one use the simulated
 meter when you scan (set `READOUT_FAKE_BLE=1` to do that anywhere). Every build also has
 **Try the demo meter** on the connect screen.
+
+## Publishing
+
+`./publish-ios.sh` builds the signed iPhone/iPad `.ipa` and refuses it if any binary carries a
+slice other than arm64, which App Store Connect rejects. `./publish-mac.sh` builds the signed
+Mac App Store `.pkg` (Apple silicon and Intel). Upload with Transporter. The full list of
+steps, certificates and profiles is in [store/CHECKLIST.md](store/CHECKLIST.md).
+
+<img src="docs/screenshots/mac-meter.png" width="820" alt="The Mac app with the meter and a wide graph">
 
 ## Linux
 

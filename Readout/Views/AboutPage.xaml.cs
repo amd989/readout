@@ -2,7 +2,7 @@ namespace Readout.Views;
 
 public partial class AboutPage : ContentPage
 {
-    public const string SourceUrl = "https://github.com/amd989/121gw";
+    public const string SourceUrl = "https://github.com/amd989/readout";
 
     public AboutPage()
     {

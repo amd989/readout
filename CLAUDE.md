@@ -27,7 +27,8 @@ dotnet build Readout -f net10.0-maccatalyst
 dotnet build Readout -f net10.0-android
 ./deploy-ios.sh        # physical iPhone; device names come from .devices (git-ignored)
 ./deploy-mac.sh        # build and launch the Mac app (--log follows its output)
-./publish-ios.sh       # Release .ipa for TestFlight / App Store
+./publish-ios.sh       # Release .ipa for TestFlight / App Store (fails on any non-arm64 slice)
+./publish-mac.sh       # Release .pkg for the Mac App Store (universal, sandboxed)
 ```
 
 ## Things to know
@@ -37,3 +38,6 @@ dotnet build Readout -f net10.0-android
 - Per-machine settings stay out of git: `Directory.Build.local.props` (Mac Debug code signing; see the `.example`) and `.devices` (iPhone UDIDs for `deploy-ios.sh`).
 - The name "121GW" belongs to EEVblog. Use it only to say what the app works with ("for the 121GW"), never as the app's name or in its icon.
 - After editing an `Info.plist`, build with `-t:Rebuild`: an incremental build can keep a stale compiled plist.
+- `docs/` is also the GitHub Pages site (plain HTML and `style.css`; `.nojekyll`). The App Store listing's support, marketing and privacy URLs point at it, so keep `privacy.html` in step with `PRIVACY.md`. `store/` has the listing text, the submission checklist and full-size screenshots (iPhone 6.9", iPad 13", Mac 2880x1800); `docs/screenshots/` has smaller copies for the web.
+- The Mac app's sandbox container is tied to the signature that first used it. A build signed with a different certificate (Release vs Debug, TestFlight) hangs at launch in `_libsecinit_appsandbox`, with no window, until the user answers macOS's access prompt; scripts can't read the container meanwhile ("Operation not permitted").
+- App Store Connect rejects any x86_64 slice in an iPhone build (ITMS-90087; Wavelength hit it through SkiaSharp). `publish-ios.sh` checks every binary in the .ipa; if a new package brings a fat framework, strip it before signing as Wavelength's `_ThinFrameworksForDevice` does.
