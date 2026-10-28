@@ -15,78 +15,91 @@
          MAUI 10's ScrollView otherwise counts the tab bar and home indicator twice on iOS,
          leaving empty space to scroll past at the bottom. -->
     <ScrollView x:Name="Scroller" SafeAreaEdges="None">
-        <!-- The graph is sized in code to take whatever height is left, so the page only
-             scrolls when the screen is too small for even a short graph. -->
-        <Grid x:Name="PageGrid" RowSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto" MaximumWidthRequest="720"
+        <!-- Two parts: the meter (connection, LCD, buttons) and the trend card. Stacked when the
+             window is taller than wide; side by side when it's wider (iPad landscape, a wide Mac
+             window). Set in code. The graph is sized in code to take whatever height is left, so
+             the page only scrolls when the screen is too small for even a short graph. -->
+        <Grid x:Name="PageGrid" RowSpacing="10" ColumnSpacing="16" RowDefinitions="Auto,Auto" MaximumWidthRequest="720"
               Padding="16,8,16,12">
 
-            <!-- Not connected: a card whose main action is Connect. -->
-            <Border Grid.Row="0" Style="{StaticResource Card}" IsVisible="{Binding ShowConnectCard}">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                    <VerticalStackLayout VerticalOptions="Center">
-                        <Label Text="{Binding StatusText}" FontFamily="OpenSansSemibold" />
-                        <Label Text="{Binding ModeName}" Style="{StaticResource SecondaryText}" />
-                    </VerticalStackLayout>
-                    <!-- A minimum width: the label changes (Connect, Stop, Cancel) and iOS can keep the
-                         width of a shorter one, clipping the text. -->
-                    <Button Grid.Column="1" Text="{Binding PrimaryActionText}" Command="{Binding PrimaryActionCommand}" MinimumWidthRequest="110" />
-                </Grid>
-            </Border>
+            <VerticalStackLayout x:Name="MeterColumn" Spacing="10" VerticalOptions="Start">
 
-            <!-- The LCD in its dark frame. While connected, the top of the frame carries a slim
-                 status line, like the print on a meter's bezel. -->
-            <Border Grid.Row="1" BackgroundColor="#292F33" StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="0">
-                <VerticalStackLayout Spacing="0">
-                    <Grid IsVisible="{Binding IsConnected}" ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8" Padding="14,4,4,0">
-                        <Ellipse Fill="#4CAF50" WidthRequest="7" HeightRequest="7" VerticalOptions="Center" />
-                        <Label Grid.Column="1" Text="{Binding ConnectedLine}" FontSize="12" TextColor="#E3E7DE"
-                               LineBreakMode="TailTruncation" VerticalOptions="Center" />
-                        <Label Grid.Column="2" Text="{Binding ConnectedDetail}" FontSize="11" TextColor="#9AA0A3" VerticalOptions="Center"
-                               IsVisible="{Binding ConnectedDetail, Converter={StaticResource NotEmpty}}" />
-                        <drawing:SignalBarsView Grid.Column="3" WidthRequest="15" HeightRequest="11" VerticalOptions="Center"
-                                                Bars="{Binding SignalBars}" IsVisible="{Binding HasSignal}" Color="#E3E7DE"
-                                                SemanticProperties.Description="{Binding SignalDescription}"
-                                                ToolTipProperties.Text="{Binding SignalDescription}" />
-                        <Button Grid.Column="4" Text="Disconnect" Command="{Binding PrimaryActionCommand}" Style="{StaticResource LinkButton}"
-                                FontSize="12" TextColor="#E8913F" Padding="8,0" HeightRequest="28" MinimumHeightRequest="28" />
+                <!-- Not connected: a card whose main action is Connect. -->
+                <Border Style="{StaticResource Card}" IsVisible="{Binding ShowConnectCard}">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <VerticalStackLayout VerticalOptions="Center">
+                            <Label Text="{Binding StatusText}" FontFamily="OpenSansSemibold" />
+                            <Label Text="{Binding ModeName}" Style="{StaticResource SecondaryText}" />
+                        </VerticalStackLayout>
+                        <!-- A minimum width: the label changes (Connect, Stop, Cancel) and iOS can keep the
+                             width of a shorter one, clipping the text. -->
+                        <Button Grid.Column="1" Text="{Binding PrimaryActionText}" Command="{Binding PrimaryActionCommand}" MinimumWidthRequest="110" />
                     </Grid>
-                    <GraphicsView
-                        x:Name="Lcd"
-                        HeightRequest="200"
-                        SemanticProperties.Description="{Binding ReadingDescription}" />
-                </VerticalStackLayout>
-            </Border>
+                </Border>
 
-            <!-- The meter's buttons, labelled as on the meter (and its manual): above a button, what
-                 it does in some modes; right under it, what holding it does. The meter's backlight
-                 label (hold MODE) is left out: with the app you're looking at the phone. -->
-            <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8"
-                  IsEnabled="{Binding IsConnected}">
-                <HorizontalStackLayout Grid.Row="0" Grid.Column="0" HorizontalOptions="Center" Spacing="3">
-                    <Label Text="15V" Style="{StaticResource KeyCaption}" />
-                    <drawing:DiodeView WidthRequest="16" HeightRequest="9" VerticalOptions="End" Margin="0,0,0,3"
-                                       Color="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray300}}"
-                                       SemanticProperties.Description="diode" />
-                </HorizontalStackLayout>
-                <Label Grid.Row="0" Grid.Column="1" Text="AutoHOLD" Style="{StaticResource KeyCaption}" />
-                <Label Grid.Row="0" Grid.Column="2" Text="▲" Style="{StaticResource KeyCaption}" />
-                <Label Grid.Row="0" Grid.Column="3" Text="▼" Style="{StaticResource KeyCaption}" />
-                <views:KeyButton Grid.Row="1" Grid.Column="0" Key="Range" Text="RANGE" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
-                <views:KeyButton Grid.Row="1" Grid.Column="1" Key="Hold" Text="HOLD" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
-                <views:KeyButton Grid.Row="1" Grid.Column="2" Key="Rel" Text="REL △" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
-                <views:KeyButton Grid.Row="1" Grid.Column="3" Key="Peak" Text="1ms PEAK" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
-                <Label Grid.Row="2" Grid.Column="2" Text="1kHz" Style="{StaticResource HoldCaption}" />
-                <Label Grid.Row="2" Grid.Column="3" Text="BT" Style="{StaticResource HoldCaption}" />
+                <!-- The LCD in its dark frame. While connected, the top of the frame carries a slim
+                     status line, like the print on a meter's bezel. -->
+                <Border BackgroundColor="#292F33" StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="0">
+                    <VerticalStackLayout Spacing="0">
+                        <Grid IsVisible="{Binding IsConnected}" ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8" Padding="14,4,4,0">
+                            <Ellipse Fill="#4CAF50" WidthRequest="7" HeightRequest="7" VerticalOptions="Center" />
+                            <Label Grid.Column="1" Text="{Binding ConnectedLine}" FontSize="12" TextColor="#E3E7DE"
+                                   LineBreakMode="TailTruncation" VerticalOptions="Center" />
+                            <Label Grid.Column="2" Text="{Binding ConnectedDetail}" FontSize="11" TextColor="#9AA0A3" VerticalOptions="Center"
+                                   IsVisible="{Binding ConnectedDetail, Converter={StaticResource NotEmpty}}" />
+                            <drawing:SignalBarsView Grid.Column="3" WidthRequest="15" HeightRequest="11" VerticalOptions="Center"
+                                                    Bars="{Binding SignalBars}" IsVisible="{Binding HasSignal}" Color="#E3E7DE"
+                                                    SemanticProperties.Description="{Binding SignalDescription}"
+                                                    ToolTipProperties.Text="{Binding SignalDescription}" />
+                            <Button Grid.Column="4" Text="Disconnect" Command="{Binding PrimaryActionCommand}" Style="{StaticResource LinkButton}"
+                                    FontSize="12" TextColor="#E8913F" Padding="8,0" HeightRequest="28" MinimumHeightRequest="28" />
+                        </Grid>
+                        <GraphicsView
+                            x:Name="Lcd"
+                            HeightRequest="200"
+                            SemanticProperties.Description="{Binding ReadingDescription}" />
+                    </VerticalStackLayout>
+                </Border>
 
-                <views:KeyButton Grid.Row="3" Grid.Column="0" Key="Mode" Text="MODE" Style="{StaticResource MeterModeButton}" KeyPressed="OnKeyPressed" Margin="0,6,0,0" />
-                <views:KeyButton Grid.Row="3" Grid.Column="1" Key="MinMax" Text="MIN/MAX" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" Margin="0,6,0,0" />
-                <views:KeyButton Grid.Row="3" Grid.Column="2" Key="Mem" Text="MEM" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" Margin="0,6,0,0" />
-                <views:KeyButton Grid.Row="3" Grid.Column="3" Key="Setup" Text="SETUP" Style="{StaticResource MeterSetupButton}" KeyPressed="OnKeyPressed" Margin="0,6,0,0" />
-            </Grid>
+                <!-- The meter's buttons, labelled as on the meter (and its manual): above a button, what
+                     it does in some modes; right under it, what holding it does. The meter's backlight
+                     label (hold MODE) is left out: with the app you're looking at the phone. -->
+                <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8"
+                      IsEnabled="{Binding IsConnected}">
+                    <HorizontalStackLayout Grid.Row="0" Grid.Column="0" HorizontalOptions="Center" Spacing="3">
+                        <Label Text="15V" Style="{StaticResource KeyCaption}" />
+                        <drawing:DiodeView WidthRequest="16" HeightRequest="9" VerticalOptions="End" Margin="0,0,0,3"
+                                           Color="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray300}}"
+                                           SemanticProperties.Description="diode" />
+                    </HorizontalStackLayout>
+                    <Label Grid.Row="0" Grid.Column="1" Text="AutoHOLD" Style="{StaticResource KeyCaption}" />
+                    <Label Grid.Row="0" Grid.Column="2" Text="▲" Style="{StaticResource KeyCaption}" />
+                    <Label Grid.Row="0" Grid.Column="3" Text="▼" Style="{StaticResource KeyCaption}" />
+                    <views:KeyButton Grid.Row="1" Grid.Column="0" Key="Range" Text="RANGE" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
+                    <views:KeyButton Grid.Row="1" Grid.Column="1" Key="Hold" Text="HOLD" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
+                    <views:KeyButton Grid.Row="1" Grid.Column="2" Key="Rel" Text="REL △" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
+                    <views:KeyButton Grid.Row="1" Grid.Column="3" Key="Peak" Text="1ms PEAK" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" />
+                    <Label Grid.Row="2" Grid.Column="2" Text="1kHz" Style="{StaticResource HoldCaption}" />
+                    <Label Grid.Row="2" Grid.Column="3" Text="BT" Style="{StaticResource HoldCaption}" />
+
+                    <views:KeyButton Grid.Row="3" Grid.Column="0" Key="Mode" Text="MODE" Style="{StaticResource MeterModeButton}" KeyPressed="OnKeyPressed" Margin="0,6,0,0" />
+                    <views:KeyButton Grid.Row="3" Grid.Column="1" Key="MinMax" Text="MIN/MAX" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" Margin="0,6,0,0" />
+                    <views:KeyButton Grid.Row="3" Grid.Column="2" Key="Mem" Text="MEM" Style="{StaticResource MeterKeyButton}" KeyPressed="OnKeyPressed" Margin="0,6,0,0" />
+                    <views:KeyButton Grid.Row="3" Grid.Column="3" Key="Setup" Text="SETUP" Style="{StaticResource MeterSetupButton}" KeyPressed="OnKeyPressed" Margin="0,6,0,0" />
+                </Grid>
+
+                <!-- Side by side only: the recording's statistics and controls (LogFooter moves here). -->
+                <Border x:Name="RecordingCard" Style="{StaticResource Card}" IsVisible="False">
+                    <VerticalStackLayout x:Name="RecordingStack" Spacing="10">
+                        <Label Text="Recording" FontFamily="OpenSansSemibold" />
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
 
             <!-- Log and graph. -->
-            <Border Grid.Row="3" x:Name="TrendCard" Style="{StaticResource Card}">
-                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+            <Border Grid.Row="1" x:Name="TrendCard" VerticalOptions="Start" Style="{StaticResource Card}">
+                <Grid x:Name="TrendGrid" RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Text="Trend" FontFamily="OpenSansSemibold" VerticalOptions="Center" />
                         <Button Grid.Column="1" Text="Full screen" Command="{Binding OpenGraphCommand}" Style="{StaticResource LinkButton}" />
@@ -96,13 +109,23 @@
                             <TapGestureRecognizer Command="{Binding OpenGraphCommand}" />
                         </views:TrendView.GestureRecognizers>
                     </views:TrendView>
-                    <Label Grid.Row="2" Text="{Binding Statistics}" Style="{StaticResource SecondaryText}" />
-                    <Label Grid.Row="3" Text="{Binding LogSummary}" Style="{StaticResource SecondaryText}" />
-                    <Grid Grid.Row="4" ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                        <Button Grid.Column="0" Text="{Binding LoggingActionText}" Command="{Binding ToggleLoggingCommand}" Style="{StaticResource QuietButton}" />
-                        <Button Grid.Column="1" Text="Clear" Command="{Binding ClearLogCommand}" IsEnabled="{Binding HasLog}" Style="{StaticResource QuietButton}" />
-                        <Button Grid.Column="2" Text="Save" Command="{Binding SaveSessionCommand}" IsEnabled="{Binding HasLog}" />
-                    </Grid>
+                    <!-- Statistics and the recording's controls. Under the graph when stacked; moved
+                         (in code) to the Recording card in the meter column when side by side. -->
+                    <VerticalStackLayout Grid.Row="2" x:Name="LogFooter" Spacing="8">
+                        <Label x:Name="StatsLine" Text="{Binding Statistics}" Style="{StaticResource SecondaryText}" />
+                        <Grid x:Name="StatsTiles" IsVisible="False" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                            <VerticalStackLayout><Label Text="MIN" Style="{StaticResource SecondaryText}" FontSize="11" /><Label Text="{Binding MinText}" FontSize="20" FontFamily="OpenSansSemibold" LineBreakMode="NoWrap" /></VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1"><Label Text="MAX" Style="{StaticResource SecondaryText}" FontSize="11" /><Label Text="{Binding MaxText}" FontSize="20" FontFamily="OpenSansSemibold" LineBreakMode="NoWrap" /></VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="1"><Label Text="AVG" Style="{StaticResource SecondaryText}" FontSize="11" /><Label Text="{Binding AvgText}" FontSize="20" FontFamily="OpenSansSemibold" LineBreakMode="NoWrap" /></VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="1" Grid.Column="1"><Label Text="P-P" Style="{StaticResource SecondaryText}" FontSize="11" /><Label Text="{Binding PeakToPeakText}" FontSize="20" FontFamily="OpenSansSemibold" LineBreakMode="NoWrap" /></VerticalStackLayout>
+                        </Grid>
+                        <Label Text="{Binding LogSummary}" Style="{StaticResource SecondaryText}" />
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                            <Button Grid.Column="0" Text="{Binding LoggingActionText}" Command="{Binding ToggleLoggingCommand}" Style="{StaticResource QuietButton}" />
+                            <Button Grid.Column="1" Text="Clear" Command="{Binding ClearLogCommand}" IsEnabled="{Binding HasLog}" Style="{StaticResource QuietButton}" />
+                            <Button Grid.Column="2" Text="Save" Command="{Binding SaveSessionCommand}" IsEnabled="{Binding HasLog}" />
+                        </Grid>
+                    </VerticalStackLayout>
                 </Grid>
             </Border>
 
