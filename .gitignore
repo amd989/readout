@@ -484,3 +484,6 @@ $RECYCLE.BIN/
 # Per-machine settings
 Directory.Build.local.props
 .devices
+
+# Store listing and checklist (kept local)
+store/*.md

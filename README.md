@@ -60,7 +60,7 @@ Windows. Built with .NET 10 and .NET MAUI.
 | `Readout.Tests/` | xUnit tests for the core. |
 | `docs/PROTOCOL.md` | The 121GW Bluetooth protocol, documented. |
 | `docs/` | Also the GitHub Pages site (`index.html`, `privacy.html`, `support.html`) and the web screenshots. |
-| `store/` | App Store listing text, the submission checklist and full-size screenshots. |
+| `store/` | Full-size App Store screenshots. |
 
 ## Building
 
@@ -93,8 +93,7 @@ meter when you scan (set `READOUT_FAKE_BLE=1` to do that anywhere). Every build 
 
 `./publish-ios.sh` builds the signed iPhone/iPad `.ipa` and refuses it if any binary carries a
 slice other than arm64, which App Store Connect rejects. `./publish-mac.sh` builds the signed
-Mac App Store `.pkg` (Apple silicon and Intel). Upload with Transporter. The full list of
-steps, certificates and profiles is in [store/CHECKLIST.md](store/CHECKLIST.md).
+Mac App Store `.pkg` (Apple silicon and Intel). Upload with Transporter.
 
 <img src="docs/screenshots/mac-meter.png" width="820" alt="The Mac app with the meter and a wide graph">
 
