@@ -114,11 +114,12 @@ if ($Install) {
     $Runtime = Get-ChildItem (Join-Path $Bin "win-$HostArch/AppPackages") -Recurse -Filter 'Microsoft.WindowsAppRuntime.*.msix' |
         Where-Object { $_.Directory.Name -eq $HostArch } | Select-Object -First 1
     Write-Host "==> Installing the $HostArch build for testing..."
-    if ($Runtime) {
-        Add-AppxPackage -Register $Layout -DependencyPath $Runtime.FullName -ForceApplicationShutdown
-    } else {
-        Add-AppxPackage -Register $Layout -ForceApplicationShutdown
+    # The app needs the Windows App Runtime. -Register can't take it as a dependency file, so
+    # install it on its own first if this PC doesn't have it (the Store does this for users).
+    if ($Runtime -and -not (Get-AppxPackage -Name $Runtime.BaseName | Where-Object { "$($_.Architecture)" -eq $HostArch })) {
+        Add-AppxPackage -Path $Runtime.FullName
     }
+    Add-AppxPackage -Register $Layout -ForceApplicationShutdown
     Write-Host "    Readout is in the Start menu. Remove it with: Get-AppxPackage $($Identity.Name) | Remove-AppxPackage"
 }
 
