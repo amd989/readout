@@ -8,9 +8,13 @@
     xmlns:drawing="clr-namespace:Readout.Drawing"
     x:DataType="vm:MeterViewModel"
     Shell.NavBarIsVisible="False"
+    SafeAreaEdges="Container"
     Title="Meter">
 
-    <ScrollView>
+    <!-- The page stays inside the safe area and the scroll view adds no insets of its own:
+         MAUI 10's ScrollView otherwise counts the tab bar and home indicator twice on iOS,
+         leaving empty space to scroll past at the bottom. -->
+    <ScrollView SafeAreaEdges="None">
         <VerticalStackLayout Padding="16,8,16,12" Spacing="10" MaximumWidthRequest="720">
 
             <!-- Not connected: a card whose main action is Connect. -->
