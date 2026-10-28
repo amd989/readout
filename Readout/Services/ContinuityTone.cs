@@ -77,7 +77,7 @@ public sealed class ContinuityTone : IContinuityTone, IDisposable
     public void Dispose() => _track?.Release();
 }
 #else
-/// <summary>No beep on this platform yet (Windows).</summary>
+/// <summary>No beep on this platform yet (Windows, Linux).</summary>
 public sealed class ContinuityTone : IContinuityTone
 {
     public void Play() { }

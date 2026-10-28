@@ -1,3 +1,4 @@
+using Readout.Services;
 using Readout.ViewModels;
 
 namespace Readout.Views;
@@ -14,7 +15,7 @@ public partial class SessionDetailPage : ContentPage
     }
 
     private void OnSamplesLoaded(object? sender, EventArgs e) =>
-        MainThread.BeginInvokeOnMainThread(() => Trend.Samples = _viewModel.GraphSamples);
+        UiThread.Post(() => Trend.Samples = _viewModel.GraphSamples);
 
     protected override async void OnDisappearing()
     {

@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		The Linux head. MAUI has no Linux TFM, so this plain net10.0 project runs the app on
+		Microsoft's GTK4 backend (dotnet/maui-labs, Microsoft.Maui.Platforms.Linux.Gtk4, which also
+		defines LINUX). It compiles the app's own sources, XAML and resources from ../Readout
+		rather than referencing that project, whose TFMs are all platform ones. Only Linux code
+		lives here: the BlueZ connection, fixes for gaps in the backend, and the GTK entry point.
+	-->
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<OutputType>Exe</OutputType>
+		<RootNamespace>Readout</RootNamespace>
+		<AssemblyName>Readout</AssemblyName>
+		<ApplicationId>md.alejandro.readout</ApplicationId>
+		<ApplicationTitle>Readout</ApplicationTitle>
+		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+		<!-- What About shows: GTK's AppInfo reads the assembly version and the informational version. -->
+		<Version>$(ApplicationDisplayVersion)</Version>
+		<InformationalVersion>$(ApplicationVersion)</InformationalVersion>
+		<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+		<MauiXamlInflator>SourceGen</MauiXamlInflator>
+		<!-- The shared sources' style warnings are the app project's business. -->
+		<EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+		<!-- XAML bindings to [RelayCommand] properties, which the XAML source generator can't see:
+		     they bind through reflection, as intended. -->
+		<NoWarn>$(NoWarn);MAUIG2045</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Compile Include="..\Readout\**\*.cs"
+		         Exclude="..\Readout\bin\**;..\Readout\obj\**;..\Readout\Platforms\**"
+		         LinkBase="App" />
+		<!-- Link, not LinkBase: App.xaml finds Resources/Styles/*.xaml by their relative path. -->
+		<MauiXaml Include="..\Readout\**\*.xaml"
+		          Exclude="..\Readout\bin\**;..\Readout\obj\**;..\Readout\Platforms\**"
+		          Link="%(RecursiveDir)%(Filename)%(Extension)" />
+		<MauiFont Include="..\Readout\Resources\Fonts\*" />
+		<MauiImage Include="..\Readout\Resources\Images\*" />
+		<MauiAsset Include="..\Readout\Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+		<MauiIcon Include="..\Readout\Resources\AppIcon\appicon.svg" ForegroundFile="..\Readout\Resources\AppIcon\appiconfg.svg" Color="#1E2326" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Readout.Core\Readout.Core.csproj" />
+		<ProjectReference Include="..\Readout.Mcp\Readout.Mcp.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Maui.Platforms.Linux.Gtk4" Version="0.1.0-preview.13.26512.5" />
+		<PackageReference Include="Microsoft.Maui.Platforms.Linux.Gtk4.Essentials" Version="0.1.0-preview.13.26512.5" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+		<!-- BleMeterConnection and BluetoothAccess (shared, the former unused here) compile against Plugin.BLE's interfaces. -->
+		<PackageReference Include="Plugin.BLE" Version="3.1.0" />
+		<PackageReference Include="Tmds.DBus.Protocol" Version="0.95.1" />
+	</ItemGroup>
+
+</Project>

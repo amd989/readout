@@ -59,7 +59,7 @@
                 </Grid>
             </Border>
 
-            <!-- Mac and Windows: let an AI assistant such as Claude use the meter over MCP. -->
+            <!-- Desktops (Mac, Windows, Linux): let an AI assistant such as Claude use the meter over MCP. -->
             <VerticalStackLayout Spacing="8" IsVisible="{Binding ShowMcp}">
                 <Label Text="AI ASSISTANTS" Style="{StaticResource SectionHeader}" Margin="0,12,0,0" />
                 <Border Style="{StaticResource Card}">

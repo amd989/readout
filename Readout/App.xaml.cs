@@ -28,9 +28,9 @@ public partial class App : Application
     }
 
     // Desktop: a window shaped like a phone in portrait, wide enough for the LCD.
-#if MACCATALYST
-    // Tall enough that the meter page fits without scrolling, Connect card and all. Other
-    // desktops keep 900 so the window fits a 1080p screen with a taskbar.
+#if MACCATALYST || LINUX
+    // Tall enough that the meter page fits without scrolling, Connect card and all (on Linux,
+    // under the header bar). Windows keeps 900 so the window fits a 1080p screen with a taskbar.
     internal static readonly Size WindowSize = new(480, 1000);
 #else
     internal static readonly Size WindowSize = new(480, 900);
