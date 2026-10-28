@@ -6,6 +6,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:Readout.ViewModels"
     x:DataType="vm:SettingsViewModel"
+    Shell.NavBarIsVisible="{OnPlatform Default=True, WinUI=False}"
     Title="Settings">
 
     <ScrollView SafeAreaEdges="None">
