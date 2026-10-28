@@ -80,6 +80,15 @@ public class BlueZNamesTests
             [new(Device + "/service0001/char0002", Gap, "00002a00-0000-1000-8000-00805f9b34fb", ["read"])]));
 
     [Theory]
+    [InlineData("public", new byte[] { 0x06 }, true)]  // LE General Discoverable, BR/EDR not supported
+    [InlineData("random", new byte[] { 0x1A }, true)]  // an iPhone: dual-mode flags, but a random address
+    [InlineData("public", new byte[] { 0x1A }, false)] // a Mac: public address, LE and BR/EDR
+    [InlineData("public", new byte[0], false)]
+    [InlineData(null, null, false)]
+    public void IsLeOnly_ReadsTheAddressTypeAndFlags(string? addressType, byte[]? flags, bool leOnly) =>
+        Assert.Equal(leOnly, BlueZNames.IsLeOnly(addressType, flags));
+
+    [Theory]
     [InlineData(new[] { "indicate", "write", "write-without-response" }, "request")]
     [InlineData(new[] { "notify", "write-without-response" }, "command")]
     [InlineData(new[] { "notify" }, "request")]

@@ -57,6 +57,16 @@ internal static class BlueZNames
         : null;
 
     /// <summary>
+    /// Whether BlueZ can only connect over LE: the device advertises from a random address
+    /// (Classic needs the public one), or its flags say "BR/EDR not supported" (bit 2). Otherwise
+    /// BlueZ may take it for a dual-mode device and try Classic Bluetooth. The 121GW's radio is
+    /// an LE-only Bluegiga module, so a Classic attempt can only fail, not pair.
+    /// </summary>
+    public static bool IsLeOnly(string? addressType, byte[]? advertisingFlags) =>
+        addressType == "random" ||
+        (advertisingFlags is { Length: > 0 } && (advertisingFlags[0] & 0x04) != 0);
+
+    /// <summary>
     /// The meter's data characteristic: by UUID, else the first one that can notify or indicate
     /// outside the standard services, as on the other platforms. In BlueZ's path order, which is
     /// the device's handle order.

@@ -99,6 +99,15 @@ class Obj(dbus.service.Object):
     def GetAll(self, interface):
         return self.interfaces.get(interface, {})
 
+    # Like bluetoothd without -E: PreferredBearer (an experimental property) isn't there.
+    @dbus.service.method(PROPS, in_signature="ssv")
+    def Set(self, interface, name, value):
+        if name not in self.interfaces.get(interface, {}):
+            log("app sets", name, "=", str(value), "(refused: no such property)")
+            raise dbus.exceptions.DBusException("No such property '%s'" % name,
+                                                name="org.freedesktop.DBus.Error.InvalidArgs")
+        self.set(interface, **{name: value})
+
     @dbus.service.signal(PROPS, signature="sa{sv}as")
     def PropertiesChanged(self, interface, changed, invalidated):
         pass
@@ -230,10 +239,10 @@ class Characteristic(Obj):
 
 
 class Device(Obj):
-    def __init__(self, bus, root, path, address, name):
+    def __init__(self, bus, root, path, address, name, flags):
         super().__init__(bus, path, {DEVICE_IF: {
-            "Address": address, "Name": name, "Alias": name,
-            "Connected": False, "ServicesResolved": False,
+            "Address": address, "AddressType": "public", "Name": name, "Alias": name,
+            "AdvertisingFlags": byte_array([flags]), "Connected": False, "ServicesResolved": False,
         }})
         self.bus = bus
         self.root = root
@@ -246,7 +255,8 @@ class Device(Obj):
 
 class Meter(Device):
     def __init__(self, bus, root):
-        super().__init__(bus, root, METER, "88:6B:0F:12:34:56", "121GW")
+        # A Bluegiga module: LE General Discoverable, BR/EDR not supported.
+        super().__init__(bus, root, METER, "88:6B:0F:12:34:56", "121GW", 0x06)
         self.timer = None
         self.data = None
         self.count = 0
@@ -327,7 +337,7 @@ def main():
     name = dbus.service.BusName("org.bluez", bus)
     root = Root(bus)
     meter = Meter(bus, root)
-    speaker = Device(bus, root, SPEAKER, "11:22:33:44:55:66", "Kitchen")
+    speaker = Device(bus, root, SPEAKER, "11:22:33:44:55:66", "Kitchen", 0x1A)
     adapter = Adapter(bus, [(meter, -58), (speaker, -70)])
     root.adapter, root.meter = adapter, meter
     for obj in (adapter, meter, speaker):
