@@ -6,14 +6,13 @@
   IgnorableNamespaces="uap rescap">
 
   <!-- Name, Publisher and PublisherDisplayName must match Partner Center > the app >
-       Product identity exactly, or the Store rejects the upload. publish-windows.ps1 refuses
-       to build a Store package while these are still placeholders.
+       Product identity exactly, or the Store rejects the upload (Store ID 9P80492G34GN).
        Version is filled in at build time from ApplicationDisplayVersion and ApplicationVersion. -->
-  <Identity Name="PARTNER-CENTER-PACKAGE-NAME" Publisher="CN=PARTNER-CENTER-PUBLISHER-ID" Version="0.0.0.0" />
+  <Identity Name="AlejandroMoraDaz.Readout" Publisher="CN=A312A118-8FCC-4887-ABFD-917260D9441A" Version="0.0.0.0" />
 
   <Properties>
     <DisplayName>$placeholder$</DisplayName>
-    <PublisherDisplayName>Alejandro Mora</PublisherDisplayName>
+    <PublisherDisplayName>Alejandro Mora Díaz</PublisherDisplayName>
     <Logo>$placeholder$.png</Logo>
   </Properties>
 
