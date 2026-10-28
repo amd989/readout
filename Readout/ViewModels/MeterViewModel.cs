@@ -36,6 +36,12 @@ public sealed partial class MeterViewModel : ObservableObject
         _session.StateChanged += (_, _) => RefreshConnection();
         _session.ReadingReceived += (_, r) => OnReading(r);
         _session.Log.Changed += (_, _) => RefreshLogThrottled();
+        // Logging can also be paused or resumed by an AI assistant through the MCP server.
+        _session.LoggingChanged += (_, _) =>
+        {
+            LoggingActionText = _session.IsLogging ? "Pause" : "Resume";
+            RefreshLog();
+        };
         RefreshConnection();
         RefreshLog();
 
@@ -182,9 +188,8 @@ public sealed partial class MeterViewModel : ObservableObject
     [RelayCommand]
     private void ToggleLogging()
     {
+        // LoggingChanged updates the button and the summary.
         _session.IsLogging = !_session.IsLogging;
-        LoggingActionText = _session.IsLogging ? "Pause" : "Resume";
-        RefreshLog();
     }
 
     [RelayCommand]
@@ -206,8 +211,7 @@ public sealed partial class MeterViewModel : ObservableObject
         if (log.Count == 0) return;
 
         var page = Shell.Current.CurrentPage;
-        var started = log.Samples[0].Time.ToLocalTime();
-        var suggested = $"{ReadingDecoder.ModeName(SessionSummary.MainMode(log.Samples))}, {started:MMM d HH:mm}";
+        var suggested = SessionSummary.SuggestedName(log.Samples);
         var name = await page.DisplayPromptAsync("Save session", "Name it so you can find it later.",
             "Save", "Cancel", initialValue: suggested, maxLength: 80);
         if (name is null) return;
@@ -215,9 +219,7 @@ public sealed partial class MeterViewModel : ObservableObject
 
         try
         {
-            var info = await _store.SaveAsync(name.Trim(), log.Samples);
-            log.Clear();
-            _autosave.Flush();
+            var info = await _store.SaveRecordingAsync(name.Trim(), log, _autosave);
             RefreshLog();
 
             if (await page.DisplayAlertAsync("Saved", $"\"{info.Name}\" is in the Sessions tab. A new recording has started.", "View", "OK"))

@@ -39,6 +39,12 @@ public static class SessionSummary
             .First().Key;
     }
 
+    /// <summary>A name for a new session: its main mode and when it started ("DC voltage, Oct 27 14:05").</summary>
+    public static string SuggestedName(IReadOnlyList<Sample> samples) =>
+        samples.Count == 0 ? "Recording"
+            : string.Format(System.Globalization.CultureInfo.CurrentCulture, "{0}, {1:MMM d HH:mm}",
+                ReadingDecoder.ModeName(MainMode(samples)), samples[0].Time.ToLocalTime());
+
     public static SessionInfo Describe(Guid id, string name, string notes, IReadOnlyList<Sample> samples)
     {
         if (samples.Count == 0)
@@ -82,6 +88,19 @@ public sealed class SessionStore(string directory)
         }, ct).ConfigureAwait(false);
 
         await WriteInfoAsync(info, ct).ConfigureAwait(false);
+        return info;
+    }
+
+    /// <summary>
+    /// Saves the live recording as a session and starts a new one: the log is cleared and the
+    /// autosave file follows. Call it on the thread that owns the log; it comes back there.
+    /// </summary>
+    public async Task<SessionInfo> SaveRecordingAsync(string name, MeasurementLog log, RecordingAutosave? autosave, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(log);
+        var info = await SaveAsync(name, log.Samples, ct);
+        log.Clear();
+        autosave?.Flush();
         return info;
     }
 

@@ -59,6 +59,11 @@ public static class MauiProgram
             sp.GetRequiredService<MeterSession>().Log,
             Path.Combine(FileSystem.AppDataDirectory, "recording.csv")));
 
+#if MACCATALYST || WINDOWS
+        // The MCP server for AI assistants, while it's on in Settings.
+        builder.Services.AddSingleton<McpHost>();
+#endif
+
         builder.Services.AddSingleton<MeterViewModel>();
         builder.Services.AddTransient<SessionsViewModel>();
         builder.Services.AddTransient<SessionDetailViewModel>();
@@ -85,7 +90,11 @@ public static class MauiProgram
         builder.Logging.SetMinimumLevel(LogLevel.Debug);
 #endif
 
-        return builder.Build();
+        var app = builder.Build();
+#if MACCATALYST || WINDOWS
+        _ = app.Services.GetRequiredService<McpHost>().ApplyAsync();
+#endif
+        return app;
     }
 
     private static bool UseFakeBluetooth()

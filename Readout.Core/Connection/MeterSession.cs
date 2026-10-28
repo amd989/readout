@@ -55,7 +55,20 @@ public sealed class MeterSession
     public MeasurementLog Log { get; } = new();
 
     /// <summary>When false, readings still update the display but aren't logged.</summary>
-    public bool IsLogging { get; set; } = true;
+    public bool IsLogging
+    {
+        get => _isLogging;
+        set
+        {
+            if (_isLogging == value) return;
+            _isLogging = value;
+            LoggingChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+    private bool _isLogging = true;
+
+    /// <summary>Raised when <see cref="IsLogging"/> changes (from the app or an AI assistant).</summary>
+    public event EventHandler? LoggingChanged;
 
     public MeterReading? Latest { get; private set; }
 

@@ -11,5 +11,9 @@
         <!-- Saving an exported CSV where the user picks. -->
         <key>com.apple.security.files.user-selected.read-write</key>
         <true/>
+        <!-- The local MCP server for AI assistants (off unless turned on in Settings;
+             it only answers requests from this computer). -->
+        <key>com.apple.security.network.server</key>
+        <true/>
     </dict>
 </plist>

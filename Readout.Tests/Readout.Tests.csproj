@@ -16,6 +16,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Readout.Core\Readout.Core.csproj" />
+		<ProjectReference Include="..\Readout.Mcp\Readout.Mcp.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- A local MCP (Model Context Protocol) server, so an AI assistant such as Claude can read
+	     the meter: the tools, and a small HTTP host on HttpListener. Plain net10.0 with no UI,
+	     so the desktop apps (and a future Linux tool) can all host it. -->
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<RootNamespace>Readout.Mcp</RootNamespace>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Readout.Tests" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Readout.Core\Readout.Core.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="ModelContextProtocol.Core" Version="2.3.0" />
+	</ItemGroup>
+
+</Project>

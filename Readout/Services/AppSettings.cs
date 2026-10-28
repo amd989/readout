@@ -41,6 +41,43 @@ public sealed class AppSettings
         set => Set("continuity-off-above", Math.Max(0, value));
     }
 
+    /// <summary>Serve the meter to AI assistants over MCP (desktop only). Off unless the user turns it on.</summary>
+    public bool McpEnabled
+    {
+        get => _prefs.Get("mcp-enabled", false);
+        set => Set("mcp-enabled", value);
+    }
+
+    public const int DefaultMcpPort = 47121;
+
+    public int McpPort
+    {
+        get => _prefs.Get("mcp-port", DefaultMcpPort);
+        set => Set("mcp-port", Math.Clamp(value, 1024, 65535));
+    }
+
+    /// <summary>The bearer token MCP clients must send. Made on first use; see <see cref="NewMcpToken"/>.</summary>
+    public string McpToken
+    {
+        get
+        {
+            var token = _prefs.Get("mcp-token", "");
+            if (token.Length == 0)
+            {
+                token = MakeToken();
+                _prefs.Set("mcp-token", token);
+            }
+            return token;
+        }
+    }
+
+    /// <summary>Replaces the token, so clients set up with the old one stop working.</summary>
+    public void NewMcpToken() => Set("mcp-token", MakeToken());
+
+    private static string MakeToken() =>
+        Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
     private void Set<T>(string key, T value)
     {
         _prefs.Set(key, value);

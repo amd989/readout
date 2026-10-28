@@ -48,6 +48,32 @@
             <Label Text="In continuity and resistance modes, the phone beeps and buzzes below the first value and stops above the second, so a wavering reading doesn't chatter."
                    Style="{StaticResource SecondaryText}" />
 
+            <!-- Mac and Windows: let an AI assistant such as Claude use the meter over MCP. -->
+            <VerticalStackLayout Spacing="8" IsVisible="{Binding ShowMcp}">
+                <Label Text="AI ASSISTANTS" Style="{StaticResource SectionHeader}" Margin="0,12,0,0" />
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout VerticalOptions="Center">
+                                <Label Text="Let AI assistants use the meter" />
+                                <Label Text="{Binding McpStatus}" Style="{StaticResource SecondaryText}" />
+                            </VerticalStackLayout>
+                            <Switch Grid.Column="1" IsToggled="{Binding McpEnabled}" VerticalOptions="Center" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                            <Label Text="Port" VerticalOptions="Center" />
+                            <Entry Grid.Column="1" Text="{Binding McpPort}" Keyboard="Numeric" WidthRequest="90" HorizontalTextAlignment="End" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Text="Copy Claude Code command" Command="{Binding CopyMcpCommandCommand}" Style="{StaticResource QuietButton}" />
+                            <Button Grid.Column="1" Text="New token" Command="{Binding NewMcpTokenCommand}" Style="{StaticResource QuietButton}" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+                <Label Text="Runs a Model Context Protocol (MCP) server on this computer, so an assistant such as Claude can read the meter, see recent readings, press its buttons and save sessions. Only programs on this computer that have the token can use it."
+                       Style="{StaticResource SecondaryText}" />
+            </VerticalStackLayout>
+
             <Label Text="ABOUT" Style="{StaticResource SectionHeader}" Margin="0,12,0,0" />
             <Border Style="{StaticResource Card}">
                 <Border.GestureRecognizers>

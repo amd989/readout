@@ -39,6 +39,7 @@ SOFTWARE.
 | .NET MAUI (Microsoft.Maui.Controls) | MIT, .NET Foundation |
 | Plugin.BLE | MIT |
 | CommunityToolkit.Mvvm | MIT, .NET Foundation |
+| ModelContextProtocol.Core (Mac and Windows) | Apache 2.0, © Model Context Protocol a Series of LF Projects, LLC. <https://csharp.sdk.modelcontextprotocol.io/> |
 | xunit.v3 (tests only) | Apache 2.0 |
 
 ## Fonts

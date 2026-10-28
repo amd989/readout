@@ -21,6 +21,9 @@ Windows. Built with .NET 10 and .NET MAUI.
 - **Reconnects by itself** to the last meter when it comes back in range (can be turned off
   in Settings).
 - **Demo meter.** Try the app without a meter (simulated readings).
+- **Works with Claude (Mac and Windows).** An optional, local-only MCP server lets an AI
+  assistant read the meter, look at recent readings, press buttons and save sessions. See
+  [docs/MCP.md](docs/MCP.md).
 
 > Readout is an independent, open-source project. It is not made, endorsed or supported
 > by EEVblog. 121GW and EEVblog are trademarks of their owners.
@@ -40,6 +43,7 @@ Windows. Built with .NET 10 and .NET MAUI.
 | Path | What |
 |---|---|
 | `Readout.Core/` | Everything about the meter that isn't UI or a Bluetooth stack: packet parsing, LCD decoding, key commands, logging and CSV, the simulated meter. Plain `net10.0`. |
+| `Readout.Mcp/` | The MCP server for AI assistants: the tools and a small loopback HTTP host, on the official MCP C# SDK. Plain `net10.0`. |
 | `Readout/` | The .NET MAUI app: Bluetooth through Plugin.BLE, view models, pages, the LCD and graph drawings. |
 | `Readout.Tests/` | xUnit tests for the core. |
 | `docs/PROTOCOL.md` | The 121GW Bluetooth protocol, documented. |
