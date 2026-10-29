@@ -140,19 +140,26 @@ public sealed class TrendDrawable : IDrawable
 
         if (count <= columns * 2)
         {
-            // Few enough readings to draw each one.
-            var path = new PathF();
+            // Few enough readings to draw each one. Each stretch between gaps is its own path:
+            // on Windows, Win2D rejects some paths with several figures ("BeginFigure ... when
+            // the figure was already begun") and the app goes down with it.
+            PathF? path = null;
             DateTimeOffset? previous = null;
             for (var i = lo; i <= hi; i++)
             {
                 var s = samples[i];
                 if (s.Value is not { } v) continue;
                 var p = new PointF(X(s), Y(v));
-                if (previous is null || s.Time - previous.Value > gap) path.MoveTo(p);
+                if (path is null || s.Time - previous!.Value > gap)
+                {
+                    if (path is not null) canvas.DrawPath(path);
+                    path = new PathF();
+                    path.MoveTo(p);
+                }
                 else path.LineTo(p);
                 previous = s.Time;
             }
-            canvas.DrawPath(path);
+            if (path is not null) canvas.DrawPath(path);
         }
         else
         {
