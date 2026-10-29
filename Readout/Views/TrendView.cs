@@ -5,11 +5,16 @@ using Readout.Drawing;
 namespace Readout.Views;
 
 /// <summary>
-/// The trend graph as a control. With <see cref="Interactive"/> on: pinch to zoom, drag to
-/// pan, double-tap to show everything again.
+/// The trend graph as a control. With <see cref="Interactive"/> on: pinch to zoom (or the
+/// mouse wheel on Windows), drag to pan, double-tap to show everything again.
 /// </summary>
 public sealed class TrendView : GraphicsView
 {
+    /// <summary>How to use an interactive graph, shown under it.</summary>
+    public static string Hint { get; } = DeviceInfo.Platform == DevicePlatform.WinUI
+        ? "Scroll to zoom, drag to pan, double-click to show everything."
+        : "Pinch to zoom, drag to pan, double-tap to show everything.";
+
     private readonly TrendDrawable _drawable = new();
     private readonly TrendWindow _window = new();
     private bool _interactive;
@@ -79,6 +84,30 @@ public sealed class TrendView : GraphicsView
         _window.Zoom(e.Scale, e.ScaleOrigin.X, TrendDrawable.DataSpan(Samples));
         Invalidate();
     }
+
+#if WINDOWS
+    private Microsoft.UI.Xaml.UIElement? _wheelSource;
+
+    protected override void OnHandlerChanged()
+    {
+        base.OnHandlerChanged();
+        if (_wheelSource is not null) _wheelSource.PointerWheelChanged -= OnWheel;
+        _wheelSource = Handler?.PlatformView as Microsoft.UI.Xaml.UIElement;
+        if (_wheelSource is not null) _wheelSource.PointerWheelChanged += OnWheel;
+    }
+
+    // A mouse can't pinch: the wheel (and two-finger scroll on a touchpad) zooms around the pointer.
+    private void OnWheel(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (!_interactive || _wheelSource is null || Width <= 0) return;
+        var point = e.GetCurrentPoint(_wheelSource);
+        var delta = point.Properties.MouseWheelDelta;
+        if (delta == 0 || point.Properties.IsHorizontalMouseWheel) return;
+        _window.Zoom(Math.Pow(1.2, delta / 120.0), point.Position.X / Width, TrendDrawable.DataSpan(Samples));
+        Invalidate();
+        e.Handled = true;
+    }
+#endif
 
     private void OnPan(object? sender, PanUpdatedEventArgs e)
     {

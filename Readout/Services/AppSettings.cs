@@ -21,9 +21,12 @@ public sealed class AppSettings
         set => Set("continuity-sound", value);
     }
 
+    /// <summary>PCs have nothing to vibrate, so Windows hides the setting and never vibrates.</summary>
+    public static bool CanVibrate => DeviceInfo.Platform != DevicePlatform.WinUI;
+
     public bool ContinuityVibration
     {
-        get => _prefs.Get("continuity-vibration", true);
+        get => CanVibrate && _prefs.Get("continuity-vibration", true);
         set => Set("continuity-vibration", value);
     }
 

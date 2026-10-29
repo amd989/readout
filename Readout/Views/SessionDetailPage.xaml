@@ -21,7 +21,7 @@
         <Border Grid.Row="1" Style="{StaticResource Card}" Padding="8,8">
             <VerticalStackLayout Spacing="4">
                 <views:TrendView x:Name="Trend" Interactive="True" HeightRequest="240" />
-                <Label Text="Pinch to zoom, drag to pan, double-tap to show everything." Style="{StaticResource SecondaryText}"
+                <Label Text="{x:Static views:TrendView.Hint}" Style="{StaticResource SecondaryText}"
                        FontSize="12" HorizontalOptions="Center" />
             </VerticalStackLayout>
         </Border>

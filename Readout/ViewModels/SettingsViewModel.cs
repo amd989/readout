@@ -36,7 +36,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         _offAbove = settings.ContinuityOffAbove.ToString("0.#", CultureInfo.CurrentCulture);
     }
 
-    public string Version { get; } = $"{AppInfo.Current.VersionString} ({AppInfo.Current.BuildString})";
+    public string Version { get; } = AppVersion.Text;
+
+    public bool ShowVibration => AppSettings.CanVibrate;
+
+    public string ContinuityHelp { get; } = AppSettings.CanVibrate
+        ? "In continuity and resistance modes, the phone beeps and buzzes below the first value and stops above the second, so a wavering reading doesn't chatter."
+        : "In continuity and resistance modes, the app beeps below the first value and stops above the second, so a wavering reading doesn't chatter.";
 
     [ObservableProperty] private bool _autoReconnect;
     [ObservableProperty] private bool _continuitySound;

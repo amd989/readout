@@ -30,7 +30,7 @@
                         <Label Text="Beep" VerticalOptions="Center" />
                         <Switch Grid.Column="1" IsToggled="{Binding ContinuitySound}" />
                     </Grid>
-                    <Grid ColumnDefinitions="*,Auto">
+                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding ShowVibration}">
                         <Label Text="Vibrate" VerticalOptions="Center" />
                         <Switch Grid.Column="1" IsToggled="{Binding ContinuityVibration}" />
                     </Grid>
@@ -46,8 +46,7 @@
                     </Grid>
                 </VerticalStackLayout>
             </Border>
-            <Label Text="In continuity and resistance modes, the phone beeps and buzzes below the first value and stops above the second, so a wavering reading doesn't chatter."
-                   Style="{StaticResource SecondaryText}" />
+            <Label Text="{Binding ContinuityHelp}" Style="{StaticResource SecondaryText}" />
 
             <!-- Mac and Windows: let an AI assistant such as Claude use the meter over MCP. -->
             <VerticalStackLayout Spacing="8" IsVisible="{Binding ShowMcp}">

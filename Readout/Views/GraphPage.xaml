@@ -21,7 +21,7 @@
 
         <views:TrendView Grid.Row="1" x:Name="Trend" Interactive="True" />
 
-        <Label Grid.Row="2" Text="Pinch to zoom, drag to pan, double-tap to show everything." Style="{StaticResource SecondaryText}"
+        <Label Grid.Row="2" Text="{x:Static views:TrendView.Hint}" Style="{StaticResource SecondaryText}"
                FontSize="12" HorizontalOptions="Center" />
     </Grid>
 </ContentPage>
