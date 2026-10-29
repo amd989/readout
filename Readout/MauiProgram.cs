@@ -95,6 +95,26 @@ public static class MauiProgram
             handler.PlatformView.OffContent = null;
             handler.PlatformView.MinWidth = 0;
         });
+
+        // On every tab switch MAUI's Shell sets the tab bar's PaneDisplayMode to Top again (up to
+        // three times). WinUI treats each set as a change even when the value is the same: it
+        // resets the bar and replays the selection animation, which hides the orange indicator
+        // until the first animation ends, so it vanishes mid-slide and pops in late. Let the first
+        // call through (MAUI also pins the mode there), then skip the ones that change nothing.
+        var tabModeApplied = new System.Runtime.CompilerServices.ConditionalWeakTable<Microsoft.Maui.Controls.Handlers.ShellItemHandler, object>();
+        Microsoft.Maui.Controls.Handlers.ShellItemHandler.Mapper.ModifyMapping(Shell.TabBarIsVisibleProperty.PropertyName, (handler, item, previous) =>
+        {
+            var wanted = ((IShellItemController)item).ShowTabs
+                ? Microsoft.UI.Xaml.Controls.NavigationViewPaneDisplayMode.Top
+                : Microsoft.UI.Xaml.Controls.NavigationViewPaneDisplayMode.LeftMinimal;
+            if (handler.PlatformView is Microsoft.UI.Xaml.Controls.NavigationView nav
+                && nav.PaneDisplayMode == wanted
+                && tabModeApplied.TryGetValue(handler, out _))
+                return;
+
+            previous?.Invoke(handler, item);
+            tabModeApplied.AddOrUpdate(handler, true);
+        });
 #endif
 
 #if DEBUG
