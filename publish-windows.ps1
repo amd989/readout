@@ -122,11 +122,10 @@ if ($Install) {
     # Register the unpacked .msix, not the build folder: packaging pulls in files (the tab icons,
     # for one) that the build folder doesn't have.
     $Layout = [System.IO.Path]::GetFullPath((Join-Path $Out "layout-$HostArch"))
+    # Windows won't register the same version again once its files changed, so remove the old
+    # test copy first (this also clears its data).
     $Installed = Get-AppxPackage -Name $Identity.Name
-    if ($Installed -and $Installed.InstallLocation -ne $Layout) {
-        # Installed from somewhere else (an older version of this script): replace it.
-        Remove-AppxPackage $Installed.PackageFullName
-    }
+    if ($Installed) { Remove-AppxPackage $Installed.PackageFullName }
     Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($Layout, 'OrdinalIgnoreCase') } | Stop-Process -Force
     Remove-Item -Recurse -Force $Layout -ErrorAction SilentlyContinue
     $Package = Join-Path $Out "Readout_$($Version)_$HostArch.msix"
