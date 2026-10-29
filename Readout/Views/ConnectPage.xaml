@@ -7,6 +7,7 @@
     xmlns:drawing="clr-namespace:Readout.Drawing"
     x:DataType="vm:ConnectViewModel"
     x:Name="Root"
+    Shell.NavBarIsVisible="{OnPlatform Default=True, WinUI=False}"
     Title="Connect a meter">
 
     <Grid RowDefinitions="Auto,*,Auto" Padding="16,12" RowSpacing="12" MaximumWidthRequest="720">

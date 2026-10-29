@@ -6,6 +6,7 @@
     xmlns:vm="clr-namespace:Readout.ViewModels"
     xmlns:views="clr-namespace:Readout.Views"
     x:DataType="vm:MeterViewModel"
+    Shell.NavBarIsVisible="{OnPlatform Default=True, WinUI=False}"
     Title="Trend">
 
     <!-- Live, full screen. Turn the phone sideways for the widest view. -->

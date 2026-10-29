@@ -7,6 +7,7 @@
     xmlns:vm="clr-namespace:Readout.ViewModels"
     xmlns:views="clr-namespace:Readout.Views"
     x:DataType="vm:SessionDetailViewModel"
+    Shell.NavBarIsVisible="{OnPlatform Default=True, WinUI=False}"
     Title="{Binding Name}">
 
     <ContentPage.ToolbarItems>
@@ -45,9 +46,12 @@
                     </Border>
                 </VerticalStackLayout>
 
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <!-- Windows hides Shell's bar (it would sit above the tabs), and Rename with it, so Rename is here. -->
+                <Grid ColumnDefinitions="{OnPlatform Default='*,*', WinUI='*,*,*'}" ColumnSpacing="8">
                     <Button Text="Delete" Command="{Binding DeleteCommand}" Style="{StaticResource QuietButton}" />
-                    <Button Grid.Column="1" Text="Export CSV" Command="{Binding ExportCommand}" />
+                    <Button Grid.Column="1" Text="Rename" Command="{Binding RenameCommand}" Style="{StaticResource QuietButton}"
+                            IsVisible="{OnPlatform Default=False, WinUI=True}" />
+                    <Button Grid.Column="{OnPlatform Default=1, WinUI=2}" Text="Export CSV" Command="{Binding ExportCommand}" />
                 </Grid>
             </VerticalStackLayout>
         </ScrollView>
