@@ -88,9 +88,10 @@ they run on remote servers, which can't reach 127.0.0.1 on your computer.
 | Tool | What it does |
 |---|---|
 | `get_status` | Connection, meter, signal, battery, logging, latest reading |
-| `get_reading` | What the meter shows now: value and unit (also in SI base units), the small display, mode, lit LCD symbols |
+| `get_reading` | What the meter shows now: value and unit (also in SI base units), the small display (and which SETUP page it is on), mode, lit LCD symbols, and the raw packet in hex |
 | `get_recent_readings` | Logged readings over the last `seconds`, thinned to `maxPoints`, with min/max/average/peak-to-peak |
 | `press_button` | Presses RANGE, HOLD, REL, PEAK, MODE, MINMAX, MEM or SETUP, short or `longPress`, and returns the reading after |
+| `sync_clock` | Sets the meter's date and time to the computer's, through its SETUP and ▲/▼ keys (up to a minute) |
 | `set_logging` | Pauses or resumes logging |
 | `clear_log` | Clears the log and starts a new recording |
 | `save_session` | Saves the log as a named session (it appears in Sessions) and starts a new recording |

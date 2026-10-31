@@ -48,6 +48,17 @@
             </Border>
             <Label Text="{Binding ContinuityHelp}" Style="{StaticResource SecondaryText}" />
 
+            <Label Text="METER" Style="{StaticResource SectionHeader}" Margin="0,12,0,0" />
+            <Border Style="{StaticResource Card}">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout VerticalOptions="Center">
+                        <Label Text="Set the meter's clock" />
+                        <Label Text="{Binding ClockStatus}" Style="{StaticResource SecondaryText}" />
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="Sync" Command="{Binding SyncClockCommand}" VerticalOptions="Center" MinimumWidthRequest="80" />
+                </Grid>
+            </Border>
+
             <!-- Mac and Windows: let an AI assistant such as Claude use the meter over MCP. -->
             <VerticalStackLayout Spacing="8" IsVisible="{Binding ShowMcp}">
                 <Label Text="AI ASSISTANTS" Style="{StaticResource SectionHeader}" Margin="0,12,0,0" />

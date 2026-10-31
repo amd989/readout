@@ -54,8 +54,18 @@ public sealed class SimulatedMeter
         MeterMode.LcdContrast, MeterMode.Year, MeterMode.Date, MeterMode.Time, MeterMode.LowZ, MeterMode.LowZ,
     ];
 
-    /// <summary>The meter's clock, for the year, date and time pages.</summary>
+    /// <summary>Real time, which the meter's clock runs from.</summary>
     public Func<DateTime> Clock { get; set; } = () => DateTime.Now;
+
+    /// <summary>How far the meter's clock is from <see cref="Clock"/>; setting the clock changes it.</summary>
+    public TimeSpan ClockOffset { get; set; }
+
+    /// <summary>The meter's clock, as its year, date and time pages show it.</summary>
+    public DateTime MeterTime => Clock() + ClockOffset;
+
+    // Editing a clock page: which field flashes, and its value. Null when not editing.
+    private int? _editField;
+    private int _editValue;
 
     public SimulatedMeter(int seed = 121) => _random = new Random(seed);
 
@@ -119,9 +129,71 @@ public sealed class SimulatedMeter
         return builder.Build();
     }
 
+    private MeterMode CurrentPage
+    {
+        get
+        {
+            if (_setupPage == 0) return MeterMode.LowZ;
+            var pages = Modes[_modeIndex].Mode == MeterMode.AcVolts ? SetupPages : SetupPages[1..];
+            return pages[(_setupPage - 1) % pages.Length];
+        }
+    }
+
+    /// <summary>The clock fields a page edits, in order: year; month and day; hour and minute.</summary>
+    private static int[] ClockFields(MeterMode page, DateTime time) => page switch
+    {
+        MeterMode.Year => [time.Year % 100],
+        MeterMode.Date => [time.Month, time.Day],
+        MeterMode.Time => [time.Hour, time.Minute],
+        _ => [],
+    };
+
+    /// <summary>
+    /// SETUP held on a clock page: starts editing its first field, or saves the flashing field
+    /// and moves to the next. As on the meter, the packet keeps showing the running clock, not
+    /// the value being edited.
+    /// </summary>
+    private void HoldSetupOnClockPage(MeterMode page)
+    {
+        if (_editField is { } field)
+        {
+            var time = MeterTime;
+            var saved = (page, field) switch
+            {
+                (MeterMode.Year, _) => new DateTime(2000 + _editValue, time.Month, Math.Min(time.Day, DateTime.DaysInMonth(2000 + _editValue, time.Month)), time.Hour, time.Minute, time.Second),
+                (MeterMode.Date, 0) => new DateTime(time.Year, _editValue, Math.Min(time.Day, DateTime.DaysInMonth(time.Year, _editValue)), time.Hour, time.Minute, time.Second),
+                (MeterMode.Date, _) => new DateTime(time.Year, time.Month, Math.Min(_editValue, DateTime.DaysInMonth(time.Year, time.Month)), time.Hour, time.Minute, time.Second),
+                (MeterMode.Time, 0) => new DateTime(time.Year, time.Month, time.Day, _editValue, time.Minute, time.Second),
+                _ => new DateTime(time.Year, time.Month, time.Day, time.Hour, _editValue, 0),
+            };
+            ClockOffset = saved - Clock();
+            var fields = ClockFields(page, MeterTime);
+            _editField = field + 1 < fields.Length ? field + 1 : null;
+            if (_editField is { } next) _editValue = fields[next];
+        }
+        else
+        {
+            _editField = 0;
+            _editValue = ClockFields(page, MeterTime)[0];
+        }
+    }
+
+    private void StepEditValue(MeterMode page, int step)
+    {
+        var (min, max) = (page, _editField) switch
+        {
+            (MeterMode.Year, _) => (0, 99),
+            (MeterMode.Date, 0) => (1, 12),
+            (MeterMode.Date, _) => (1, 31),
+            (MeterMode.Time, 0) => (0, 23),
+            _ => (0, 59),
+        };
+        _editValue = _editValue + step > max ? min : _editValue + step < min ? max : _editValue + step;
+    }
+
     private void SetupPage(PacketBuilder builder, MeterMode page, double t)
     {
-        var now = Clock();
+        var now = MeterTime;
         builder.SubMode = page;
         (builder.SubDecimals, builder.SubRawValue) = page switch
         {
@@ -139,6 +211,26 @@ public sealed class SimulatedMeter
     /// <summary>Reacts to a button the way the real meter roughly does.</summary>
     public void Press(MeterKey key, bool longPress = false)
     {
+        var page = CurrentPage;
+        if (page is MeterMode.Year or MeterMode.Date or MeterMode.Time)
+        {
+            if (key == MeterKey.Setup && longPress)
+            {
+                HoldSetupOnClockPage(page);
+                return;
+            }
+            if (_editField is not null)
+            {
+                // ▲ and ▼ change the flashing value; a short SETUP drops the edit and moves on.
+                if (key is MeterKey.Rel or MeterKey.Peak && !longPress)
+                {
+                    StepEditValue(page, key == MeterKey.Rel ? 1 : -1);
+                    return;
+                }
+                _editField = null;
+            }
+        }
+
         switch (key)
         {
             case MeterKey.Setup when !longPress:
@@ -149,6 +241,7 @@ public sealed class SimulatedMeter
             case MeterKey.Mode:
                 _modeIndex = (_modeIndex + 1) % Modes.Length;
                 _setupPage = 0;
+                _editField = null;
                 _relative = false;
                 _hold = HoldState.Off;
                 _heldValue = null;

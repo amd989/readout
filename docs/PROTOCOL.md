@@ -148,6 +148,21 @@ MODE step, range and SETUP page:
 - Temperature with no thermocouple: the meter shows OFL, but the packet sends 0 with the
   overload bit clear.
 
+### Setting the clock
+
+There's no command for it: the year, date and time pages are edited with the keys, as on the
+meter. Hold SETUP on the page and its first field flashes; ▲ (REL) and ▼ (1ms PEAK) step it
+by one; hold SETUP to save it, which moves to the second field (day, minute) or ends the
+edit. A short SETUP drops the edit and goes to the next page.
+
+- While a field flashes, packets keep showing the saved clock, not the value being edited.
+  Each saved field shows up in the next packet.
+- A key sent within about a second of the SETUP hold is lost.
+- Saving the minute keeps the meter's own seconds, which the packet doesn't carry, so the
+  clock can only be set to within a minute.
+
+`MeterClockSync` does this, checking each page after saving it.
+
 Several users on the EEVblog forum reported the VA (power) readings as unreliable, so the
 power ranges above are the least certain part of this table.
 

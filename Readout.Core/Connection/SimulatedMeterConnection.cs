@@ -22,6 +22,12 @@ public sealed class SimulatedMeterConnection : IMeterConnection, IDisposable
 
     public TimeSpan Interval { get; init; } = TimeSpan.FromMilliseconds(200);
 
+    /// <summary>The simulated meter itself, for tests that set up its state (its clock, say).</summary>
+    public SimulatedMeter Simulator => _meter;
+
+    /// <summary>A key press reached the simulated meter (for tests).</summary>
+    public event EventHandler<MeterKey>? KeySent;
+
     public ConnectionState State { get; private set; }
     public DiscoveredMeter? Meter { get; private set; }
 
@@ -72,7 +78,10 @@ public sealed class SimulatedMeterConnection : IMeterConnection, IDisposable
     public Task SendKeyAsync(MeterKey key, bool longPress = false, CancellationToken ct = default)
     {
         if (State == ConnectionState.Connected)
+        {
             _meter.Press(key, longPress);
+            KeySent?.Invoke(this, key);
+        }
         return Task.CompletedTask;
     }
 

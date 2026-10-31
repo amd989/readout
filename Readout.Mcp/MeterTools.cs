@@ -62,6 +62,13 @@ public sealed class MeterTools(
             Destructive = false,
             Idempotent = false,
         }),
+        McpServerTool.Create(SyncClockAsync, new McpServerToolCreateOptions
+        {
+            Name = "sync_clock",
+            Title = "Set the meter's clock",
+            Description = "Sets the meter's date and time (used for its own SD card logging) to this computer's, by pressing its SETUP, ▲ and ▼ buttons as a person would. Takes up to a minute; the meter's buttons and dial must be left alone meanwhile. Ends with the small display back where it was.",
+            Idempotent = true,
+        }),
         McpServerTool.Create(SetLoggingAsync, new McpServerToolCreateOptions
         {
             Name = "set_logging",
@@ -167,6 +174,21 @@ public sealed class MeterTools(
         await Task.Delay(SettleTime, _time, ct);
         var after = await ui.InvokeAsync(() => session.Latest is { } r ? ToResult(r) : null);
         return McpResultJson.Serialize(new PressResult(key.ToString().ToUpperInvariant(), longPress, after));
+    }
+
+    public async Task<string> SyncClockAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            // The sync waits between presses off the main thread; the session's key sends and
+            // latest reading are safe to use from there.
+            await new MeterClockSync(session).SyncAsync(ct: ct);
+        }
+        catch (MeterClockSyncException ex)
+        {
+            throw new McpException(ex.Message);
+        }
+        return McpResultJson.Serialize(new ClockResult(DateTime.Now));
     }
 
     public Task<string> SetLoggingAsync(

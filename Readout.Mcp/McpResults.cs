@@ -28,6 +28,9 @@ public sealed record RecentReadingsResult(
 
 public sealed record PressResult(string Button, bool LongPress, ReadingResult? ReadingAfter);
 
+/// <param name="SetTo">This computer's local time when the clock was set.</param>
+public sealed record ClockResult(DateTime SetTo);
+
 public sealed record LoggingResult(bool Logging, int LoggedReadings);
 
 public sealed record SessionResult(
@@ -40,6 +43,7 @@ public sealed record SessionDetailResult(SessionResult Session, bool Thinned, IR
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(StatusResult))]
+[JsonSerializable(typeof(ClockResult))]
 [JsonSerializable(typeof(ReadingResult))]
 [JsonSerializable(typeof(RecentReadingsResult))]
 [JsonSerializable(typeof(PressResult))]

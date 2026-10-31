@@ -84,7 +84,7 @@ public sealed class McpServerTests : IAsyncLifetime
         var tools = await _client!.ListToolsAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(
-            ["clear_log", "get_reading", "get_recent_readings", "get_session", "get_status", "list_sessions", "press_button", "save_session", "set_logging"],
+            ["clear_log", "get_reading", "get_recent_readings", "get_session", "get_status", "list_sessions", "press_button", "save_session", "set_logging", "sync_clock"],
             tools.Select(t => t.Name).Order());
         Assert.Equal("readout", _client!.ServerInfo?.Name);
     }

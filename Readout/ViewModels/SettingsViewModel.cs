@@ -34,6 +34,34 @@ public sealed partial class SettingsViewModel : ObservableObject
         _continuityVibration = settings.ContinuityVibration;
         _onBelow = settings.ContinuityOnBelow.ToString("0.#", CultureInfo.CurrentCulture);
         _offAbove = settings.ContinuityOffAbove.ToString("0.#", CultureInfo.CurrentCulture);
+        _isMeterConnected = session.State == ConnectionState.Connected;
+        session.StateChanged += (_, _) => IsMeterConnected = session.State == ConnectionState.Connected;
+    }
+
+    private const string ClockHelp =
+        "Sets its date and time to this device's, by pressing its buttons for you. Takes up to a minute; leave the meter alone meanwhile.";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SyncClockCommand))]
+    private bool _isMeterConnected;
+
+    [ObservableProperty] private string _clockStatus = ClockHelp;
+
+    private bool CanSyncClock() => IsMeterConnected;
+
+    [RelayCommand(CanExecute = nameof(CanSyncClock))]
+    private async Task SyncClockAsync()
+    {
+        var progress = new Progress<string>(step => ClockStatus = step);
+        try
+        {
+            await new MeterClockSync(_session).SyncAsync(progress);
+            ClockStatus = $"Set to {DateTime.Now:g}.";
+        }
+        catch (MeterClockSyncException ex)
+        {
+            ClockStatus = ex.Message;
+        }
     }
 
     public string Version { get; } = AppVersion.Text;
