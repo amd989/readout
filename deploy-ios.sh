@@ -3,11 +3,16 @@
 #   ./deploy-ios.sh              the first device in .devices
 #   ./deploy-ios.sh phone ipad   devices by their name in .devices, from one build
 #   ./deploy-ios.sh <UDID>       any device (xcrun devicectl list devices)
+#   ./deploy-ios.sh --release    an optimized (AOT) build, as TestFlight gets: Debug builds run
+#                                through an interpreter on the device, so judge speed with this
 set -e
+
+CONFIG=Debug
+if [ "$1" = "--release" ]; then CONFIG=Release; shift; fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJ="$SCRIPT_DIR/Readout"
-APP="$PROJ/bin/Debug/net10.0-ios/ios-arm64/Readout.app"
+APP="$PROJ/bin/$CONFIG/net10.0-ios/ios-arm64/Readout.app"
 BUNDLE="md.alejandro.readout"
 
 # The newest installed iOS workload's mlaunch, so a workload update doesn't break this.
@@ -46,8 +51,8 @@ if [ ${#DEVICES[@]} -eq 0 ]; then
   DEVICES=("$DEFAULT")
 fi
 
-echo "==> Building..."
-dotnet build "$PROJ" -f net10.0-ios \
+echo "==> Building ($CONFIG)..."
+dotnet build "$PROJ" -f net10.0-ios -c "$CONFIG" \
   /p:RuntimeIdentifier=ios-arm64 \
   /p:CodesignKey="$KEY" \
   /p:AutomaticProvisioning=true
