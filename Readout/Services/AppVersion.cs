@@ -15,11 +15,12 @@ public static class AppVersion
 #if LINUX
             var assembly = AppInfo.Current.Version;
             return $"{(assembly.Build > 0 ? assembly.ToString(3) : assembly.ToString(2))} ({AppInfo.Current.BuildString})";
-#endif
+#else
             if (DeviceInfo.Platform != DevicePlatform.WinUI)
                 return $"{AppInfo.Current.VersionString} ({AppInfo.Current.BuildString})";
             var version = AppInfo.Current.Version;
             return version.Build >= 0 ? version.ToString(3) : version.ToString();
+#endif
         }
     }
 }

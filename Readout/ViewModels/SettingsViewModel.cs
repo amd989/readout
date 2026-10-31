@@ -66,7 +66,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public string Version { get; } = AppVersion.Text;
 
-    public bool ShowVibration => AppSettings.CanVibrate;
+    public bool ShowVibration { get; } = AppSettings.CanVibrate;
 
     public string ContinuityHelp { get; } = AppSettings.CanVibrate
         ? "In continuity and resistance modes, the phone beeps and buzzes below the first value and stops above the second, so a wavering reading doesn't chatter."
