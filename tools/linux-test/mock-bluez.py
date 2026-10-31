@@ -190,7 +190,12 @@ class Adapter(Obj):
     @dbus.service.method(ADAPTER_IF)
     def StopDiscovery(self):
         log("discovery stopped")
-        self.set(ADAPTER_IF, Discovering=False)
+        # As on the Fedora laptop: the scan is still being taken down for a moment after
+        # StopDiscovery returns, and a connect meanwhile is aborted (see Meter.Connect).
+        def down():
+            self.set(ADAPTER_IF, Discovering=False)
+            return False
+        GLib.timeout_add(300, down)
         if self.discovery is not None:
             GLib.source_remove(self.discovery)
             self.discovery = None
@@ -267,6 +272,9 @@ class Meter(Device):
 
     @dbus.service.method(DEVICE_IF)
     def Connect(self):
+        if self.root.adapter.interfaces[ADAPTER_IF]["Discovering"]:
+            log("app connects to the meter while the adapter is still scanning: aborted")
+            raise dbus.exceptions.DBusException("le-connection-abort-by-local", name="org.bluez.Error.Failed")
         if self.away:
             log("app connects to the meter, which is out of range")
             raise dbus.exceptions.DBusException("le-connection-abort-by-local", name="org.bluez.Error.Failed")
