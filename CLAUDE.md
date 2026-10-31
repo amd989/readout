@@ -15,7 +15,7 @@ Readout is a companion app for the EEVblog 121GW multimeter over Bluetooth LE, b
 - `Readout.Mcp/` (plain `net10.0`): the MCP server for AI assistants. `MeterTools` are the tools (results are source-generated JSON, so trimming is safe; meter access goes through `IUiThread` to the main thread). `McpHttpServer` serves them with the MCP SDK's stateless `StreamableHttpServerTransport` over `LoopbackHttp`, a minimal HTTP/1.1 on a loopback `TcpListener`. Not HttpListener: it does a DNS lookup on start that hangs in the Mac sandbox. Referenced by the app on Mac Catalyst and Windows only; `Readout/Services/McpHost` starts and stops it from Settings. See `docs/MCP.md`.
 - `Readout.Tests/`: xUnit v3 tests for the core and the MCP server (end to end with the SDK's client).
 - `docs/PROTOCOL.md`: the packet format. Read it before touching `Protocol/` or `Display/`.
-- `Readout.Core/Fs9721/`: the decoder for Fortune FS9721_LP3 meters (a DIY Bluetooth bridge on cheap meters), written from Fortune's datasheet. Readings go through the same log, graphs and MCP tools; no Bluetooth bridge yet. `docs/FS9721.md` has the frame format and the plan. Tests use real frames from `Readout.Tests/TestData/fs9721-890g.txt`.
+- `Readout.Core/Fs9721/`: the decoder for Fortune FS9721_LP3 meters (a DIY Bluetooth bridge on cheap meters), written from Fortune's datasheet. Readings go through the same log, graphs and MCP tools. `firmware/fs9721-bridge/` is the ESP32 bridge (PlatformIO, NimBLE) that forwards the chip's bytes over BLE; its UUIDs and name must match `Protocol/BridgeBluetooth` (a test checks). `docs/FS9721.md` has the frame format and the plan. Tests use real frames from `Readout.Tests/TestData/fs9721-890g.txt`.
 
 The protocol is ported from the official EEVblog app's `PrivatePostRelease` branch (https://gitlab.com/eevblog/app-121gw, MIT, David Ledger), and matches EEVblog's "Revised Packet Format Blob V2" document. Its `master` branch has an obsolete 52-character text parser; ignore it. Keep the David Ledger credit in THIRD_PARTY_NOTICES.md and the About page.
 
@@ -32,6 +32,7 @@ dotnet build Readout -f net10.0-android
 ./publish-ios.sh       # Release .ipa for TestFlight / App Store (fails on any non-arm64 slice)
 ./publish-mac.sh       # Release .pkg for the Mac App Store (universal, sandboxed)
 ./publish-windows.ps1  # Release .msix (x64 + arm64) for the Microsoft Store; -Test -Install for a local copy
+pio run -d firmware/fs9721-bridge -e esp32dev -t upload   # the FS9721 bridge (or -e esp32c3)
 ```
 
 ## Things to know
