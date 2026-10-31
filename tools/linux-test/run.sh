@@ -7,7 +7,8 @@
 set -e
 mode=${1:-fake}
 mkdir -p /out
-Xvfb :99 -screen 0 1200x1100x24 &
+# SCREEN sets the virtual display (e.g. 1280x800x24 for a small laptop).
+Xvfb :99 -screen 0 ${SCREEN:-1200x1100x24} &
 export DISPLAY=:99 GSK_RENDERER=cairo GTK_A11Y=none
 sleep 1
 if [ "$mode" = mock ]; then
