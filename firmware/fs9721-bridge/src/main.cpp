@@ -51,6 +51,21 @@ static uint32_t lastByteAt = 0;
 static uint32_t framesSent = 0;
 static uint32_t ledOffAt = 0;
 
+// When nothing arrives for a while, say what the RX pin is doing, to help with the wiring.
+static const uint32_t QUIET_REPORT_MS = 5000;
+static uint32_t quietSince = 0;
+static uint32_t samplesHigh = 0;
+static uint32_t samplesLow = 0;
+
+static void reportQuiet() {
+  uint32_t total = samplesHigh + samplesLow;
+  const char *level = samplesLow == 0 ? "always high: the meter isn't sending (is RS232 on its LCD?)"
+                      : samplesHigh == 0 ? "always low: check the TXD and ground wires, or the inversion setting"
+                                         : "changing, but no bytes: check the inversion setting";
+  Serial.printf("no data for %lu s; GPIO %d is %s (%lu%% high)\n", (unsigned long)(QUIET_REPORT_MS / 1000),
+                METER_RX_PIN, level, (unsigned long)(total ? samplesHigh * 100 / total : 0));
+}
+
 static void setLed(bool on) {
   if (LED_PIN < 0) return;
   digitalWrite(LED_PIN, (on != (LED_ACTIVE_LOW != 0)) ? HIGH : LOW);
@@ -135,10 +150,24 @@ void setup() {
 }
 
 void loop() {
+  bool received = false;
   while (meter.available() > 0) {
     if (pendingLength == MAX_CHUNK) sendPending();
     pending[pendingLength++] = (uint8_t)meter.read();
     lastByteAt = millis();
+    received = true;
+  }
+
+  // The line as the UART sees it: idle is high once the inversion is right.
+  bool high = (digitalRead(METER_RX_PIN) == HIGH) != (METER_RX_INVERTED != 0);
+  (high ? samplesHigh : samplesLow)++;
+  if (received) {
+    quietSince = millis();
+    samplesHigh = samplesLow = 0;
+  } else if (millis() - quietSince >= QUIET_REPORT_MS) {
+    reportQuiet();
+    quietSince = millis();
+    samplesHigh = samplesLow = 0;
   }
 
   if (pendingLength > 0 && millis() - lastByteAt >= FRAME_GAP_MS) sendPending();

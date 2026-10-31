@@ -64,8 +64,12 @@ advertising as "Readout FS9721 A1B2"
 17 25 3b 4f 5f 67 7f 87 9f a0 b0 c0 d4 e8
 ```
 
-Every line should run `1x 2x … ex`. Nothing at all: check ENTX (the RS232 symbol should be on)
-and the wiring. Lines of other bytes: the inversion setting is wrong for your wiring.
+Every line should run `1x 2x … ex`. Lines of other bytes mean the inversion setting is wrong
+for your wiring. When nothing arrives for 5 seconds, the bridge says what the input pin is doing:
+
+- *always high*: the meter isn't sending. Check ENTX; the RS232 symbol should be on.
+- *always low*: TXD or ground isn't connected (or is on the wrong pin), or the inversion is wrong.
+- *changing, but no bytes*: the inversion setting is wrong.
 
 The LED blinks with each frame (GPIO 2 on dev boards, GPIO 8 on the C3 SuperMini).
 
