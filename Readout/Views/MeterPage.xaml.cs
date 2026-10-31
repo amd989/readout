@@ -31,6 +31,9 @@ public partial class MeterPage : ContentPage
         Scroller.SizeChanged += (_, _) => QueueFitTrend();
         PageGrid.SizeChanged += (_, _) => QueueFitTrend();
         TrendCard.SizeChanged += (_, _) => QueueFitTrend();
+        // The connect card hiding (an automatic reconnect at launch) moves the graph card up
+        // without resizing it: the meter column is what changes.
+        MeterColumn.SizeChanged += (_, _) => QueueFitTrend();
 
         // The view model raises these on the main thread.
         _viewModel.KeyPressed += (_, press) =>
@@ -154,8 +157,11 @@ public partial class MeterPage : ContentPage
         // below don't add up. The size change that follows queues another fit.
         if (Trend.HeightRequest >= 0 && Math.Abs(Trend.Height - Trend.HeightRequest) > 1) return;
 
+        // Where the graph card starts, from the meter column above it rather than the card's
+        // own position, which isn't updated yet when the column has just shrunk.
+        var cardTop = _wide == true ? TrendCard.Y : PageGrid.Padding.Top + MeterColumn.Height + PageGrid.RowSpacing;
         var restOfCard = TrendCard.Height - Trend.Height;
-        var available = Scroller.Height - TrendCard.Y - restOfCard - PageGrid.Padding.Bottom;
+        var available = Scroller.Height - cardTop - restOfCard - PageGrid.Padding.Bottom;
         var height = Math.Max(MinimumTrendHeight, Math.Floor(available));
         if (Math.Abs(height - Trend.HeightRequest) > 1)
             Trend.HeightRequest = height;
