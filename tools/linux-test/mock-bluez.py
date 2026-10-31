@@ -52,7 +52,7 @@ def log(*parts):
     print("[mock]", *parts, flush=True)
 
 
-def packet(mode, range_index, raw, coupling, dc, ac, hold):
+def packet(mode, range_index, raw, coupling, dc, ac, hold, rel=False, lpf=False):
     """A 19-byte packet, as Readout.Core's PacketBuilder makes them (docs/PROTOCOL.md)."""
     d = bytearray(19)
     d[0] = 0xF2
@@ -69,8 +69,8 @@ def packet(mode, range_index, raw, coupling, dc, ac, hold):
     d[11], d[12] = (812 >> 8), 812 & 0xFF   # 8.12 V
     d[13] = 1                     # bar on, full scale 50
     d[14] = min(31, raw * 26 // 50000)
-    d[15] = (coupling & 0x3) << 3 | 0x04 | 0x02   # AUTO, APO
-    d[16] = 0x40                  # Bluetooth
+    d[15] = (coupling & 0x3) << 3 | 0x04 | 0x02 | (0x40 if lpf else 0)   # AUTO, APO, 1kHz
+    d[16] = 0x40 | (0x10 if rel else 0)                                    # Bluetooth, REL
     d[17] = (2 << 2 if hold else 0) | (0x02 if ac else 0) | (0x01 if dc else 0)
     x = 0
     for b in d[:18]:
@@ -269,6 +269,8 @@ class Meter(Device):
         self.hold = False
         self.pending = b""
         self.away = False
+        self.rel = False
+        self.lpf = False
 
     @dbus.service.method(DEVICE_IF)
     def Connect(self):
@@ -317,7 +319,7 @@ class Meter(Device):
         mode, range_index, coupling, dc, ac = MODES[self.mode]
         if not self.hold:
             self.raw = 12300 + int(200 * math.sin(self.count / 8))
-        self.pending += packet(mode, range_index, self.raw, coupling, dc, ac, self.hold)
+        self.pending += packet(mode, range_index, self.raw, coupling, dc, ac, self.hold, self.rel, self.lpf)
         # Indications of up to 20 bytes: 19-byte packets straddle them.
         while len(self.pending) >= 20 or (self.pending and self.count % 2 == 0):
             chunk, self.pending = self.pending[:20], self.pending[20:]
@@ -335,6 +337,11 @@ class Meter(Device):
                 self.mode = (self.mode + 1) % len(MODES)
             elif key == "HOLD":
                 self.hold = not self.hold
+            # As on the meter: REL toggles relative mode, holding it the 1 kHz low-pass filter.
+            elif key == "REL" and long:
+                self.lpf = not self.lpf
+            elif key == "REL":
+                self.rel = not self.rel
         else:
             log("unexpected write", value.hex())
 

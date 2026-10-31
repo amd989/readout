@@ -16,6 +16,7 @@ public sealed class Program : GtkMauiApplication
         ShellHeaderBar.Register();
         TrendMouse.Register();
         KeyButtonPress.Register();
+        CollectionEmptyView.Register();
         return MauiProgram.CreateMauiApp();
     }
 

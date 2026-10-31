@@ -20,7 +20,8 @@ public sealed class KeyButton : Button
     public static readonly BindableProperty KeyProperty =
         BindableProperty.Create(nameof(Key), typeof(MeterKey), typeof(KeyButton), MeterKey.Mode);
 
-    private IDispatcherTimer? _timer;
+    // Each press gets a number, so a long-press check left over from an earlier press does nothing.
+    private int _press;
     private bool _down;
     private bool _longSent;
 
@@ -44,17 +45,29 @@ public sealed class KeyButton : Button
         Haptic(HapticFeedbackType.Click);
         _down = true;
         _longSent = false;
-        _timer ??= CreateTimer();
-        _timer.Start();
+        // A one-off delayed check rather than a reused timer: on Linux the GTK backend's
+        // one-shot timer stays "running" after it fires, so starting it again did nothing and
+        // every other hold went out as a short press.
+        var press = ++_press;
+        Dispatcher.DispatchDelayed(LongPressTime, () => SendLongPress(press));
     }
 
+    private void SendLongPress(int press)
+    {
+        if (press != _press || !_down || _longSent) return;
+        _longSent = true;
+        Haptic(HapticFeedbackType.LongPress);
+        KeyPressed?.Invoke(this, new KeyPressedEventArgs(Key, longPress: true));
+    }
+
+    // A release before the long press is a short press. (So is a Released with no Pressed,
+    // as a keyboard activation can be.) Once up, the pending long-press check does nothing.
     private void OnReleased(object? sender, EventArgs e)
     {
+        var longSent = _down && _longSent;
         _down = false;
-        // Once the long press went, the one-shot timer has fired and there's nothing to stop.
-        if (_longSent) return;
-        _timer?.Stop();
-        KeyPressed?.Invoke(this, new KeyPressedEventArgs(Key, longPress: false));
+        if (!longSent)
+            KeyPressed?.Invoke(this, new KeyPressedEventArgs(Key, longPress: false));
     }
 
     /// <summary>
@@ -63,10 +76,7 @@ public sealed class KeyButton : Button
     /// </summary>
     public void CancelPress()
     {
-        if (!_down) return;
         _down = false;
-        if (!_longSent) _timer?.Stop();
-        _longSent = true;
     }
 
     /// <summary>
@@ -82,20 +92,6 @@ public sealed class KeyButton : Button
         await Task.Delay(longPress ? 400 : 90);
         VisualStateManager.GoToState(this, IsEnabled ? "Normal" : "Disabled");
         await this.ScaleToAsync(1, 160, Easing.CubicOut);
-    }
-
-    private IDispatcherTimer CreateTimer()
-    {
-        var timer = Dispatcher.CreateTimer();
-        timer.Interval = LongPressTime;
-        timer.IsRepeating = false;
-        timer.Tick += (_, _) =>
-        {
-            _longSent = true;
-            Haptic(HapticFeedbackType.LongPress);
-            KeyPressed?.Invoke(this, new KeyPressedEventArgs(Key, longPress: true));
-        };
-        return timer;
     }
 
     private static void Haptic(HapticFeedbackType type)
