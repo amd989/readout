@@ -16,7 +16,7 @@ using Props = Dictionary<string, VariantValue>;
 /// the device: StartNotify on the data characteristic (its indications arrive as Value
 /// changes), WriteValue for key presses. A meter's id is its address.
 /// </summary>
-internal sealed class BlueZMeterConnection : IMeterConnection
+internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
 {
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan StopTimeout    = TimeSpan.FromSeconds(3);
@@ -32,6 +32,11 @@ internal sealed class BlueZMeterConnection : IMeterConnection
     // meter name it was last seen with: once connected, BlueZ may swap in the GAP device name.
     private readonly Dictionary<string, Props> _devices = [];
     private readonly Dictionary<string, string> _names = [];
+
+    // What this scan has heard, for the log: a meter that never shows up is otherwise silent.
+    private readonly HashSet<string> _heard = [];
+    private readonly HashSet<string> _metersFound = [];
+    private CancellationTokenSource? _scanReport;
 
     private string? _adapterPath;
     private bool _powered;
@@ -127,6 +132,14 @@ internal sealed class BlueZMeterConnection : IMeterConnection
             throw;
         }
         _discovering = true;
+        lock (_gate)
+        {
+            _heard.Clear();
+            _metersFound.Clear();
+        }
+        StopScanReport();
+        _scanReport = new CancellationTokenSource();
+        _ = ReportScanAsync(_scanReport.Token);
 
         // Meters with an RSSI are being heard right now (BlueZ drops it when discovery ends, so
         // another program is scanning too): list them at once rather than at their next advert.
@@ -140,6 +153,7 @@ internal sealed class BlueZMeterConnection : IMeterConnection
         if (_discovering)
         {
             _discovering = false;
+            StopScanReport();
             await WithStopTimeoutAsync(_bus.CallAsync(AdapterPath, BlueZNames.Adapter1, "StopDiscovery"), "scan stop").ConfigureAwait(false);
         }
         if (State == ConnectionState.Scanning)
@@ -414,16 +428,50 @@ internal sealed class BlueZMeterConnection : IMeterConnection
     {
         string? name;
         short? rssi;
+        bool first;
         lock (_gate)
         {
+            _heard.Add(address);
             if (!_devices.TryGetValue(address, out var props)) return;
             name = BlueZNames.MeterName(props.String("Name"), props.String("Alias"));
             if (name is not null) _names[address] = name;
             else if (!_names.TryGetValue(address, out name)) return;
             rssi = props.Int16("RSSI");
+            first = rssi is not null && _metersFound.Add(address);
         }
         if (rssi is null) return;
+        if (first) _logger.LogInformation("scan: found {Name} at {Address}, {Rssi} dBm", name, address, rssi);
         MeterDiscovered?.Invoke(this, new DiscoveredMeter(address, name, rssi.Value));
+    }
+
+    private void StopScanReport()
+    {
+        _scanReport?.Cancel();
+        _scanReport?.Dispose();
+        _scanReport = null;
+    }
+
+    public void Dispose() => StopScanReport();
+
+    // Every 15 s while scanning: how many devices BlueZ has heard, and how many look like a meter.
+    private async Task ReportScanAsync(CancellationToken ct)
+    {
+        var started = DateTime.UtcNow;
+        try
+        {
+            while (true)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(15), ct).ConfigureAwait(false);
+                int heard, meters;
+                lock (_gate) (heard, meters) = (_heard.Count, _metersFound.Count);
+                if (meters > 0)
+                    _logger.LogInformation("scan: {Seconds:0} s, heard {Heard} devices, {Meters} of them meters", (DateTime.UtcNow - started).TotalSeconds, heard, meters);
+                else
+                    _logger.LogInformation("scan: {Seconds:0} s, heard {Heard} devices, none named 121GW or Bluegiga; is Bluetooth on at the meter (BT on its display), and not connected to a phone?",
+                        (DateTime.UtcNow - started).TotalSeconds, heard);
+            }
+        }
+        catch (OperationCanceledException) { }
     }
 
     private void SetState(ConnectionState state)
