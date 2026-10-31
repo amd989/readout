@@ -167,7 +167,7 @@ public sealed class MeterSession
 
     private void OnPacket(MeterPacket packet)
     {
-        var reading = ReadingDecoder.Decode(packet, _time.GetLocalNow());
+        var reading = ReadingDecoder.Decode(packet, _time.GetLocalNow(), Latest?.Sub.Label);
         Latest = reading;
         if (packet.SubMode == MeterMode.Battery && !packet.SubOverload)
             BatteryVolts = packet.SubRawValue / Math.Pow(10, packet.SubDecimals);

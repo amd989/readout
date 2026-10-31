@@ -173,12 +173,50 @@ public class ReadingDecoderTests
     [InlineData(MeterMode.Battery, "Battery", "V")]
     [InlineData(MeterMode.Year, "Year", "")]
     [InlineData(MeterMode.AutoPowerOffOn, "Auto power-off: on", "")]
-    [InlineData(MeterMode.Dbm, "dBm reference", "dBm")]
+    [InlineData(MeterMode.Dbm, "dBm", "dBm")]
+    [InlineData((MeterMode)156, "Burden voltage", "V")]
     public void Decode_SetupPages_AreLabelled(MeterMode subMode, string label, string unit)
     {
         var r = Decode(new PacketBuilder { SubMode = subMode, SubRawValue = 42 });
         Assert.Equal(label, r.Sub.Label);
         Assert.Equal(unit, r.Sub.Unit);
+    }
+
+    // Packets recorded from a real 121GW (firmware of 2025) going through SETUP.
+    [Theory]
+    [InlineData("F21780000000000000780200000B0002400056", "APO.on", "Auto power-off: on")]
+    [InlineData("F21780000000000000820000130B00024000BD", "2019", "Year")]
+    [InlineData("F2178000000000000087000A0E0B00024000AF", "10-14", "Date")]
+    [InlineData("F217800000000000008C00102A0B000240009A", "16-42", "Time")]
+    [InlineData("F21780000000000000A00000040B0002400088", "4", "LCD contrast")]
+    public void Decode_RecordedSetupPages(string hex, string text, string label)
+    {
+        Assert.True(MeterPacket.TryParse(Convert.FromHexString(hex), out var packet));
+        var r = ReadingDecoder.Decode(packet, DateTimeOffset.UnixEpoch);
+        Assert.Equal(text, r.Sub.Text);
+        Assert.Equal(label, r.Sub.Label);
+    }
+
+    [Theory]
+    [InlineData("Auto power-off: on", ReadingDecoder.BuzzerPage)]
+    [InlineData(ReadingDecoder.BuzzerPage, ReadingDecoder.BuzzerPage)]
+    [InlineData("Time", ReadingDecoder.IdOrIntervalPage)]
+    [InlineData(null, ReadingDecoder.IdOrIntervalPage)]
+    public void Decode_UnnumberedSetupPage_NamedByThePageBefore(string? previous, string expected)
+    {
+        // Sub mode 0 with no value: what the meter sends for the buzzer, ID and interval pages.
+        Assert.True(MeterPacket.TryParse(Convert.FromHexString("F21780000000000000000000000B000240002C"), out var packet));
+        var r = ReadingDecoder.Decode(packet, DateTimeOffset.UnixEpoch, previous);
+        Assert.Equal(expected, r.Sub.Label);
+        Assert.Equal("", r.Sub.Text);
+        Assert.Equal("", r.Sub.Unit);
+    }
+
+    [Fact]
+    public void Decode_AcPlusDc_IsNamedSo()
+    {
+        Assert.True(MeterPacket.TryParse(Convert.FromHexString("F21780000002000000640100F600001E4000AA"), out var packet));
+        Assert.Equal("AC+DC voltage", ReadingDecoder.Decode(packet, DateTimeOffset.UnixEpoch).ModeName);
     }
 
     [Fact]
@@ -219,5 +257,27 @@ public class ReadingDecoderTests
     {
         var icons = Decode(new PacketBuilder { Hold = HoldState.AutoHold }).Icons;
         Assert.True(icons.Hold && icons.AutoHold);
+    }
+
+    [Fact]
+    public void SimulatedMeter_SetupStepsThroughThePages()
+    {
+        var meter = new Readout.Core.Simulation.SimulatedMeter { Clock = () => new DateTime(2026, 10, 31, 9, 5, 0) };
+        var labels = new List<string?>();
+        string? previous = null;
+        for (var i = 0; i < 10; i++)
+        {
+            meter.Press(MeterKey.Setup);
+            Assert.True(MeterPacket.TryParse(meter.PacketAt(TimeSpan.FromSeconds(i)), out var packet));
+            var r = ReadingDecoder.Decode(packet, DateTimeOffset.UnixEpoch, previous);
+            labels.Add(r.Sub.Label);
+            previous = r.Sub.Label;
+            if (r.Sub.Label == "Time") Assert.Equal("09-05", r.Sub.Text);
+        }
+        Assert.Equal(new string?[]
+        {
+            "Battery", "Auto power-off: on", ReadingDecoder.BuzzerPage, "LCD contrast", "Year", "Date", "Time",
+            ReadingDecoder.IdOrIntervalPage, ReadingDecoder.IdOrIntervalPage, ReadingDecoder.MeterTemperaturePage,
+        }, labels);
     }
 }

@@ -14,7 +14,11 @@ public static class ReadingDecoder
     /// <summary>"DC voltage", "Resistance"… for a main mode.</summary>
     public static string ModeName(MeterMode mode) => ModeInfo.For(mode)?.Name ?? $"Mode {(int)mode}";
 
-    public static MeterReading Decode(MeterPacket packet, DateTimeOffset receivedAt)
+    /// <param name="previousSubLabel">
+    /// The SETUP page the last packet showed, if any. A few pages are sent without a page
+    /// number, and the page before them is the only way to tell which they are.
+    /// </param>
+    public static MeterReading Decode(MeterPacket packet, DateTimeOffset receivedAt, string? previousSubLabel = null)
     {
         var mode = packet.Mode;
         var info = ModeInfo.For(mode);
@@ -54,7 +58,7 @@ public static class ReadingDecoder
             Packet = packet,
             ReceivedAt = receivedAt,
             Mode = mode,
-            ModeName = ModeName(mode),
+            ModeName = DisplayModeName(mode, packet.Coupling),
             MainText = mainText,
             MainNegative = packet.MainNegative,
             MainOverload = packet.MainOverload,
@@ -62,7 +66,7 @@ public static class ReadingDecoder
             Value = value,
             BaseValue = baseValue,
             BaseUnit = info?.BaseUnit ?? "",
-            Sub = DecodeSub(packet),
+            Sub = DecodeSub(packet, previousSubLabel),
             Bar = new BarGraph(
                 packet.BarOn,
                 packet.BarOn ? Math.Min(BarGraph.TotalSegments, packet.BarValue + 1) : 0,
@@ -71,6 +75,18 @@ public static class ReadingDecoder
                 packet.BarTicks150),
             Icons = DecodeIcons(packet),
         };
+    }
+
+    /// <summary>
+    /// The mode name, with AC+DC where the meter says so: on V it's a MODE step of its own,
+    /// sent as AC voltage with the AC+DC coupling.
+    /// </summary>
+    private static string DisplayModeName(MeterMode mode, Coupling coupling)
+    {
+        var name = ModeName(mode);
+        return coupling == Coupling.AcPlusDc && name.StartsWith("AC ", StringComparison.Ordinal)
+            ? "AC+DC " + name[3..]
+            : name;
     }
 
     /// <summary>
@@ -103,9 +119,20 @@ public static class ReadingDecoder
         return digits.Insert(digits.Length - decimals, ".");
     }
 
-    private static SubDisplay DecodeSub(MeterPacket packet)
+    /// <summary>The SETUP pages the meter sends with no page number (sub mode 0), by the page before.</summary>
+    internal const string BuzzerPage = "Buzzer";
+    /// <summary>The meter's own temperature: where the small display rests in most modes.</summary>
+    public const string MeterTemperaturePage = "Meter temperature";
+    internal const string IdOrIntervalPage = "Meter ID or interval";
+
+    private static SubDisplay DecodeSub(MeterPacket packet, string? previousLabel)
     {
         var mode = packet.SubMode;
+        if (SetupPageText(packet, previousLabel) is { } page)
+            return page;
+        // Burden voltage comes as 150 and, on the µA, mA and A positions, 156.
+        if ((int)mode is > 150 and < 160)
+            mode = MeterMode.BurdenVoltage;
         var milli = SubMilli(packet) ? "m" : "";
 
         var unit = mode switch
@@ -137,7 +164,7 @@ public static class ReadingDecoder
 
         var label = mode switch
         {
-            MeterMode.SetupTemperatureC or MeterMode.SetupTemperatureF => "Temperature",
+            MeterMode.SetupTemperatureC or MeterMode.SetupTemperatureF => MeterTemperaturePage,
             MeterMode.Battery => "Battery",
             MeterMode.AutoPowerOffOn => "Auto power-off: on",
             MeterMode.AutoPowerOffOff => "Auto power-off: off",
@@ -146,13 +173,40 @@ public static class ReadingDecoder
             MeterMode.Time => "Time",
             MeterMode.BurdenVoltage => "Burden voltage",
             MeterMode.LcdContrast => "LCD contrast",
-            MeterMode.Dbm => "dBm reference",
+            MeterMode.Dbm => "dBm",
             MeterMode.Interval => "Logging interval",
             _ => null,
         };
 
         var text = packet.SubOverload ? "OFL" : FormatSub(packet.SubRawValue, packet.SubDecimals);
         return new SubDisplay(text, packet.SubNegative && !packet.SubOverload, unit, label);
+    }
+
+    /// <summary>
+    /// SETUP pages whose digits aren't a plain number, drawn the way the meter shows them;
+    /// null for everything else.
+    /// </summary>
+    private static SubDisplay? SetupPageText(MeterPacket packet, string? previousLabel)
+    {
+        var raw = packet.SubRawValue;
+        var (high, low) = (raw >> 8, raw & 0xFF);
+        return packet.SubMode switch
+        {
+            MeterMode.AutoPowerOffOn => new SubDisplay("APO.on", false, "", "Auto power-off: on"),
+            MeterMode.AutoPowerOffOff => new SubDisplay("APO.oF", false, "", "Auto power-off: off"),
+            // Two digits on the wire; the meter shows the full year.
+            MeterMode.Year => new SubDisplay((raw < 100 ? 2000 + raw : raw).ToString(CultureInfo.InvariantCulture), false, "", "Year"),
+            // Month and day, and hour and minute, one byte each.
+            MeterMode.Date => new SubDisplay($"{high:D2}-{low:D2}", false, "", "Date"),
+            MeterMode.Time => new SubDisplay($"{high:D2}-{low:D2}", false, "", "Time"),
+            // The buzzer, meter ID and logging interval pages come with no page number and no
+            // value. The buzzer follows auto power-off; ID and interval follow the time.
+            MeterMode.LowZ => new SubDisplay("", false, "",
+                previousLabel is BuzzerPage || previousLabel?.StartsWith("Auto power-off", StringComparison.Ordinal) == true
+                    ? BuzzerPage
+                    : IdOrIntervalPage),
+            _ => null,
+        };
     }
 
     /// <summary>

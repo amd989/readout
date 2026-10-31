@@ -41,6 +41,21 @@ public sealed class SimulatedMeter
     private double? _heldValue;
     private MinMaxState _minMax;
     private double _lastLive;
+    private int _setupPage;
+
+    /// <summary>
+    /// What SETUP steps through, in a real meter's order, after the mode's own sub reading
+    /// (page 0). The buzzer, ID and interval pages come with sub mode 0 and no value, as the
+    /// real meter sends them.
+    /// </summary>
+    private static readonly MeterMode[] SetupPages =
+    [
+        MeterMode.SetupTemperatureC, MeterMode.Battery, MeterMode.AutoPowerOffOn, MeterMode.LowZ,
+        MeterMode.LcdContrast, MeterMode.Year, MeterMode.Date, MeterMode.Time, MeterMode.LowZ, MeterMode.LowZ,
+    ];
+
+    /// <summary>The meter's clock, for the year, date and time pages.</summary>
+    public Func<DateTime> Clock { get; set; } = () => DateTime.Now;
 
     public SimulatedMeter(int seed = 121) => _random = new Random(seed);
 
@@ -78,7 +93,12 @@ public sealed class SimulatedMeter
             MinMax = _minMax,
         };
 
-        if (sim.Mode == MeterMode.AcVolts)
+        // Page 0 is the mode's own reading; in modes where that's the meter temperature,
+        // SETUP's temperature page is skipped, as on the meter.
+        var pages = sim.Mode == MeterMode.AcVolts ? SetupPages : SetupPages[1..];
+        if (_setupPage > 0)
+            SetupPage(builder, pages[(_setupPage - 1) % pages.Length], t);
+        else if (sim.Mode == MeterMode.AcVolts)
         {
             // Mains frequency on the sub display: "50.00 Hz".
             builder.SubMode = MeterMode.Frequency;
@@ -88,9 +108,9 @@ public sealed class SimulatedMeter
         }
         else
         {
-            // The meter's own temperature: "23.5 °C".
-            builder.SubMode = MeterMode.Temperature;
-            builder.CelsiusIcon = true;
+            // The meter's own temperature, "23.5 °C": the SETUP temperature page, which is
+            // where a real meter's small display rests.
+            builder.SubMode = MeterMode.SetupTemperatureC;
             builder.SubDecimals = 1;
             builder.SubRawValue = (int)Math.Round((23.5 + 0.1 * Math.Sin(t / 30.0)) * 10);
         }
@@ -99,13 +119,36 @@ public sealed class SimulatedMeter
         return builder.Build();
     }
 
+    private void SetupPage(PacketBuilder builder, MeterMode page, double t)
+    {
+        var now = Clock();
+        builder.SubMode = page;
+        (builder.SubDecimals, builder.SubRawValue) = page switch
+        {
+            MeterMode.SetupTemperatureC => (1, (int)Math.Round((23.5 + 0.1 * Math.Sin(t / 30.0)) * 10)),
+            MeterMode.Battery => (1, 62),
+            MeterMode.AutoPowerOffOn => (2, 0),
+            MeterMode.LcdContrast => (0, 4),
+            MeterMode.Year => (0, now.Year % 100),
+            MeterMode.Date => (0, now.Month << 8 | now.Day),
+            MeterMode.Time => (0, now.Hour << 8 | now.Minute),
+            _ => (0, 0),
+        };
+    }
+
     /// <summary>Reacts to a button the way the real meter roughly does.</summary>
     public void Press(MeterKey key, bool longPress = false)
     {
         switch (key)
         {
+            case MeterKey.Setup when !longPress:
+                // Past the last page, back to the mode's own reading.
+                var count = (Modes[_modeIndex].Mode == MeterMode.AcVolts ? SetupPages.Length : SetupPages.Length - 1) + 1;
+                _setupPage = (_setupPage + 1) % count;
+                break;
             case MeterKey.Mode:
                 _modeIndex = (_modeIndex + 1) % Modes.Length;
+                _setupPage = 0;
                 _relative = false;
                 _hold = HoldState.Off;
                 _heldValue = null;

@@ -129,6 +129,25 @@ Sub-display SETUP pages (byte 9): 100 temperature °C, 105 temperature °F, 110 
 120 auto power-off on, 125 auto power-off off, 130 year, 135 date, 140 time, 150 burden
 voltage, 160 LCD contrast, 180 dBm, 190 logging interval.
 
+What a real meter (2025 firmware) sends, from walking one through every dial position,
+MODE step, range and SETUP page:
+
+- SETUP steps the small display through: (the mode's own reading, e.g. Hz on AC V, then
+  dBm 180) → temperature 100 → battery 110 → auto power-off 120/125 → buzzer → LCD contrast
+  160 → year 130 → date 135 → time 140 → meter ID → logging interval → back. In most modes
+  the small display rests on the temperature page.
+- The buzzer, meter ID and logging interval pages come as sub mode **0** with a value of 0:
+  the packet doesn't say which page it is or what it shows. Only the page before tells them
+  apart (the buzzer follows auto power-off; ID and interval follow the time).
+- Year: two digits (19 for 2019). Date and time: one byte each in bytes 11 and 12, month
+  then day, hour then minute (`0A 0E` is 10-14, `10 2A` is 16:42). Not a 16-bit number.
+- Burden voltage comes as **156** on the µA, mA and A positions, not 150.
+- dBm (180) is a live reading of the input in AC V, with the dBm symbol lit.
+- AC+DC on V is sent as main mode 2 (AC voltage) with coupling 3.
+- On the VA position the small display alternates between the current and the voltage.
+- Temperature with no thermocouple: the meter shows OFL, but the packet sends 0 with the
+  overload bit clear.
+
 Several users on the EEVblog forum reported the VA (power) readings as unreliable, so the
 power ranges above are the least certain part of this table.
 
