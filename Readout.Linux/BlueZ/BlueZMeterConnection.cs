@@ -500,7 +500,8 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
 
     public void Dispose() => StopScanReport();
 
-    // Every 15 s while scanning: how many devices BlueZ has heard, and how many look like a meter.
+    // While scanning: how many devices BlueZ has heard, and how many look like a meter. After
+    // 15 s, then every 2 minutes (the Connect page can stay open for hours).
     private async Task ReportScanAsync(CancellationToken ct)
     {
         var started = DateTime.UtcNow;
@@ -508,7 +509,8 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
         {
             while (true)
             {
-                await Task.Delay(TimeSpan.FromSeconds(15), ct).ConfigureAwait(false);
+                var first = DateTime.UtcNow - started < TimeSpan.FromSeconds(10);
+                await Task.Delay(first ? TimeSpan.FromSeconds(15) : TimeSpan.FromMinutes(2), ct).ConfigureAwait(false);
                 int heard, meters;
                 lock (_gate) (heard, meters) = (_heard.Count, _metersFound.Count);
                 if (meters > 0)
