@@ -40,8 +40,8 @@ decodes them. It advertises as **Readout FS9721 XXXX** (the last four hex digits
 
 ### Bench test without the optocoupler
 
-For a first try, TXD can go straight to the GPIO and VSS to GND. Build with
-`METER_RX_INVERTED=0` in `platformio.ini`. The ESP32 is then connected to the meter's circuit:
+For a first try, TXD can go straight to the GPIO and VSS to GND. Flash the `-direct` build
+(`pio run -e esp32dev-direct -t upload`), which reads the signal the right way up. The ESP32 is then connected to the meter's circuit:
 keep the test leads out of anything but low voltages, and never measure mains while the ESP32
 is on USB.
 
