@@ -7,9 +7,17 @@ using Microsoft.Extensions.Logging;
 
 namespace Readout.ViewModels;
 
-/// <summary>A meter in the scan list.</summary>
-public sealed record MeterItem(DiscoveredMeter Meter)
+/// <summary>
+/// A meter in the scan list. Updated in place each time the meter is heard again, so its row
+/// stays put: replacing the rows on every advertisement rebuilt them on Linux, and a tap that
+/// straddled a rebuild was lost.
+/// </summary>
+public sealed partial class MeterItem(DiscoveredMeter meter) : ObservableObject
 {
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Name), nameof(SignalBars), nameof(Detail), nameof(SignalDescription))]
+    private DiscoveredMeter _meter = meter;
+
     public string Name => Meter.Name;
     public int SignalBars => SignalQuality.Bars(Meter.Rssi);
 
@@ -131,11 +139,27 @@ public sealed partial class ConnectViewModel : ObservableObject
     private void OnStateChanged(object? sender, EventArgs e) =>
         IsScanning = _session.State == ConnectionState.Scanning;
 
+    // Brings the list in step with the session's, keeping each meter's row (see MeterItem).
     private void Refresh()
     {
         IsScanning = _session.State == ConnectionState.Scanning;
-        Meters.Clear();
-        foreach (var meter in _session.Discovered)
-            Meters.Add(new MeterItem(meter));
+        var discovered = _session.Discovered;
+        for (var i = 0; i < discovered.Count; i++)
+        {
+            var meter = discovered[i];
+            var at = -1;
+            for (var j = i; j < Meters.Count && at < 0; j++)
+                if (Meters[j].Meter.Id == meter.Id) at = j;
+
+            if (at < 0)
+            {
+                Meters.Insert(i, new MeterItem(meter));
+                continue;
+            }
+            if (at != i) Meters.Move(at, i);
+            if (Meters[i].Meter != meter) Meters[i].Meter = meter;
+        }
+        while (Meters.Count > discovered.Count)
+            Meters.RemoveAt(Meters.Count - 1);
     }
 }
