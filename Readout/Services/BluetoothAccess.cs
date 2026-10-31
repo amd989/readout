@@ -14,9 +14,12 @@ public sealed class BluetoothAccess(Func<IBluetoothLE>? ble)
         var status = await MainThread.InvokeOnMainThreadAsync(Permissions.RequestAsync<NearbyDevices>);
         if (status != PermissionStatus.Granted)
             return "Readout needs the Nearby devices permission to find your meter. You can allow it in Settings.";
-#else
-        await Task.CompletedTask;
 #endif
+        // Right after launch the radio reports Unknown until the OS answers. Auto-connect
+        // runs then, so give it a moment rather than give up.
+        for (var waited = 0; waited < 3000 && ble().State is BluetoothState.Unknown or BluetoothState.TurningOn; waited += 100)
+            await Task.Delay(100);
+
         return ble().State switch
         {
             BluetoothState.On => null,
