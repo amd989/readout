@@ -21,7 +21,8 @@ for ARCH in "${ARCHS[@]}"; do
   echo "==> Publishing linux-$ARCH..."
   rm -rf "$DIR"
   dotnet publish "$PROJ" -c Release -r "linux-$ARCH" --self-contained -o "$DIR" -p:DebugType=none
-  tar -czf "$OUT/Readout-linux-$ARCH.tar.gz" -C "$OUT/linux-$ARCH" readout
+  # Without macOS's extended attributes, which GNU tar warns about for every file.
+  COPYFILE_DISABLE=1 tar --no-xattrs -czf "$OUT/Readout-linux-$ARCH.tar.gz" -C "$OUT/linux-$ARCH" readout
 done
 
 echo "==> Done:"
