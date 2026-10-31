@@ -77,7 +77,7 @@
                 <!-- The meter's buttons, labelled as on the meter (and its manual): above a button, what
                      it does in some modes; right under it, what holding it does. The meter's backlight
                      label (hold MODE) is left out: with the app you're looking at the phone. -->
-                <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8"
+                <Grid x:Name="KeyGrid" ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8"
                       IsEnabled="{Binding IsConnected}">
                     <HorizontalStackLayout Grid.Row="0" Grid.Column="0" HorizontalOptions="Center" Spacing="3">
                         <Label Text="15V" Style="{StaticResource KeyCaption}" />

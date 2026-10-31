@@ -50,19 +50,21 @@ public sealed class KeyButton : Button
     {
         _timer?.Stop();
         if (!_longSent)
-        {
             KeyPressed?.Invoke(this, new KeyPressedEventArgs(Key, longPress: false));
-            Flash();
-        }
     }
 
     /// <summary>
-    /// A quick dip in size when a press is sent: a tap is often over before the Pressed color
-    /// shows, so this is what tells you the button took.
+    /// Plays a press: the Pressed color and a dip in size, held a little longer for a long
+    /// press. For every key that reaches the meter, and for keys pressed on the meter itself,
+    /// so the screen follows the real buttons. (A tap is often over before the Pressed color
+    /// shows on its own, so this is also what tells you a tap took.)
     /// </summary>
-    private async void Flash()
+    public async void PlayPress(bool longPress)
     {
+        VisualStateManager.GoToState(this, "Pressed");
         await this.ScaleToAsync(0.92, 60, Easing.CubicOut);
+        await Task.Delay(longPress ? 400 : 90);
+        VisualStateManager.GoToState(this, IsEnabled ? "Normal" : "Disabled");
         await this.ScaleToAsync(1, 160, Easing.CubicOut);
     }
 
@@ -76,7 +78,6 @@ public sealed class KeyButton : Button
             _longSent = true;
             Haptic(HapticFeedbackType.LongPress);
             KeyPressed?.Invoke(this, new KeyPressedEventArgs(Key, longPress: true));
-            Flash();
         };
         return timer;
     }

@@ -110,6 +110,36 @@ public sealed class MeterSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task HoldPressedOnTheMeter_IsReported()
+    {
+        var presses = new List<MeterKeyPress>();
+        _session.KeyPressed += (_, k) => presses.Add(k);
+        await _session.ConnectAsync(Meter);
+
+        _bluetooth.Send(new PacketBuilder { MainRawValue = 1 }.BuildPacket());
+        _bluetooth.Send(new PacketBuilder { MainRawValue = 1, Hold = HoldState.Hold }.BuildPacket());
+
+        Assert.Equal([new MeterKeyPress(MeterKey.Hold, false)], presses);
+    }
+
+    [Fact]
+    public async Task KeySentFromTheApp_IsReportedOnce()
+    {
+        var presses = new List<MeterKeyPress>();
+        _session.KeyPressed += (_, k) => presses.Add(k);
+        await _session.ConnectAsync(Meter);
+        _bluetooth.Send(new PacketBuilder { MainRawValue = 1 }.BuildPacket());
+
+        await _session.SendKeyAsync(MeterKey.Hold);
+        _bluetooth.Send(new PacketBuilder { MainRawValue = 1, Hold = HoldState.Hold }.BuildPacket());
+        // Long after, the meter's own HOLD press counts again.
+        _time.Advance(TimeSpan.FromSeconds(5));
+        _bluetooth.Send(new PacketBuilder { MainRawValue = 1 }.BuildPacket());
+
+        Assert.Equal([new MeterKeyPress(MeterKey.Hold, false), new MeterKeyPress(MeterKey.Hold, false)], presses);
+    }
+
+    [Fact]
     public async Task Connect_RemembersTheMeter()
     {
         DiscoveredMeter? remembered = null;

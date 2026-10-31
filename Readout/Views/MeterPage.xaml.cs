@@ -33,6 +33,12 @@ public partial class MeterPage : ContentPage
         TrendCard.SizeChanged += (_, _) => QueueFitTrend();
 
         // The view model raises these on the main thread.
+        _viewModel.KeyPressed += (_, press) =>
+        {
+            foreach (var button in KeyGrid.Children.OfType<KeyButton>())
+                if (button.Key == press.Key)
+                    button.PlayPress(press.LongPress);
+        };
         _viewModel.DisplayChanged += (_, _) =>
         {
             _lcd.Reading = _viewModel.Reading;

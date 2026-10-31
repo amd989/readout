@@ -35,6 +35,11 @@ public sealed partial class MeterViewModel : ObservableObject
 
         _session.StateChanged += (_, _) => RefreshConnection();
         _session.ReadingReceived += (_, r) => OnReading(r);
+        _session.KeyPressed += (_, press) =>
+        {
+            _ = ShowLastKeyAsync(press.LongPress ? $"Hold {KeyName(press.Key)}" : KeyName(press.Key));
+            KeyPressed?.Invoke(this, press);
+        };
         _session.Log.Changed += (_, _) => RefreshLogThrottled();
         // Logging can also be paused or resumed by an AI assistant through the MCP server.
         _session.LoggingChanged += (_, _) =>
@@ -79,6 +84,9 @@ public sealed partial class MeterViewModel : ObservableObject
 
     /// <summary>Raised when the LCD should redraw (every reading).</summary>
     public event EventHandler? DisplayChanged;
+
+    /// <summary>A key went to the meter or was pressed on it: the page plays the press on that button.</summary>
+    public event EventHandler<MeterKeyPress>? KeyPressed;
 
     /// <summary>Raised when the graph should redraw (at most twice a second).</summary>
     public event EventHandler? TrendChanged;
@@ -192,7 +200,6 @@ public sealed partial class MeterViewModel : ObservableObject
 
     public async Task PressKeyAsync(MeterKey key, bool longPress)
     {
-        _ = ShowLastKeyAsync(longPress ? $"Hold {KeyName(key)}" : KeyName(key));
         try
         {
             await _session.SendKeyAsync(key, longPress);

@@ -95,6 +95,16 @@ public sealed class MeterSession
     public event EventHandler? DiscoveredChanged;
     public event EventHandler<MeterReading>? ReadingReceived;
 
+    /// <summary>
+    /// A key was pressed: sent from here (the app's buttons, an AI assistant, the clock sync), or
+    /// pressed on the meter itself, as worked out from the display (<see cref="KeyInference"/>).
+    /// </summary>
+    public event EventHandler<MeterKeyPress>? KeyPressed;
+
+    /// <summary>A display change this soon after sending a key is that key's, not a press on the meter.</summary>
+    private static readonly TimeSpan SentKeyEcho = TimeSpan.FromSeconds(1.5);
+    private readonly Dictionary<MeterKey, DateTimeOffset> _sentKeys = [];
+
     /// <summary>Starts looking for meters.</summary>
     /// <param name="autoConnect">
     /// Connect by itself when the remembered meter shows up. For background reconnects (at
@@ -152,10 +162,15 @@ public sealed class MeterSession
             await Active.DisconnectAsync().ConfigureAwait(false);
     }
 
-    public Task SendKeyAsync(MeterKey key, bool longPress = false, CancellationToken ct = default) =>
-        Active.State == ConnectionState.Connected
-            ? Active.SendKeyAsync(key, longPress, ct)
-            : Task.CompletedTask;
+    public Task SendKeyAsync(MeterKey key, bool longPress = false, CancellationToken ct = default)
+    {
+        if (Active.State != ConnectionState.Connected)
+            return Task.CompletedTask;
+        lock (_sentKeys)
+            _sentKeys[key] = _time.GetUtcNow();
+        Dispatch(() => KeyPressed?.Invoke(this, new MeterKeyPress(key, longPress)));
+        return Active.SendKeyAsync(key, longPress, ct);
+    }
 
     private async Task LeaveDemoAsync()
     {
@@ -168,12 +183,21 @@ public sealed class MeterSession
     private void OnPacket(MeterPacket packet)
     {
         var reading = ReadingDecoder.Decode(packet, _time.GetLocalNow(), Latest?.Sub.Label);
+        var pressed = Latest is { } previous ? KeyInference.Infer(previous.Packet, packet) : null;
         Latest = reading;
+        if (pressed is { } press && !SentRecently(press.Key))
+            KeyPressed?.Invoke(this, press);
         if (packet.SubMode == MeterMode.Battery && !packet.SubOverload)
             BatteryVolts = packet.SubRawValue / Math.Pow(10, packet.SubDecimals);
         if (IsLogging)
             Log.Add(reading);
         ReadingReceived?.Invoke(this, reading);
+    }
+
+    private bool SentRecently(MeterKey key)
+    {
+        lock (_sentKeys)
+            return _sentKeys.TryGetValue(key, out var sent) && _time.GetUtcNow() - sent < SentKeyEcho;
     }
 
     private void OnDiscovered(DiscoveredMeter meter)
