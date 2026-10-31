@@ -25,8 +25,6 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
     private readonly IBluetoothLE _ble;
     private readonly IAdapter _adapter;
     private readonly ILogger<BleMeterConnection> _logger;
-    private readonly PacketFramer _framer = new();
-    private readonly Lock _framerLock = new();
     private readonly Dictionary<Guid, IDevice> _seen = [];
 
     private CancellationTokenSource? _scanCts;
@@ -54,7 +52,7 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
 
     public event EventHandler? StateChanged;
     public event EventHandler<DiscoveredMeter>? MeterDiscovered;
-    public event EventHandler<MeterPacket>? PacketReceived;
+    public event EventHandler<ReadOnlyMemory<byte>>? DataReceived;
     public event EventHandler? ConnectionLost;
 
     public Task StartScanAsync(CancellationToken ct = default)
@@ -132,8 +130,6 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
             var data = await FindDataCharacteristicAsync(device, timeout.Token)
                 ?? throw new InvalidOperationException("This device has no 121GW data characteristic.");
 
-            lock (_framerLock)
-                _framer.Reset();
             data.ValueUpdated += OnValueUpdated;
             await data.StartUpdatesAsync(timeout.Token);
             _data = data;
@@ -282,12 +278,8 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
         var value = e.Characteristic.Value;
         if (value is null || value.Length == 0) return;
 
-        IReadOnlyList<MeterPacket> packets;
-        lock (_framerLock)
-            packets = _framer.Push(value);
-
-        foreach (var packet in packets)
-            PacketReceived?.Invoke(this, packet);
+        // Copied: the platform may reuse the buffer, and the session reads it later on the main thread.
+        DataReceived?.Invoke(this, value.ToArray());
     }
 
     private void OnLinkDropped(IDevice device, string? error)

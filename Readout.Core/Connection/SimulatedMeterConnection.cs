@@ -6,14 +6,13 @@ namespace Readout.Core.Connection;
 /// <summary>
 /// A connection to <see cref="SimulatedMeter"/>: a scan finds it at once, and once connected
 /// it sends a packet every <see cref="Interval"/>, split across two "notifications" the way
-/// Bluetooth delivers them, so the framing path is the real one.
+/// Bluetooth delivers them, so the driver's framing path is the real one.
 /// </summary>
 public sealed class SimulatedMeterConnection : IMeterConnection, IDisposable
 {
     public static readonly DiscoveredMeter DemoMeter = new("demo", "121GW (demo)", -50);
 
     private readonly SimulatedMeter _meter = new();
-    private readonly PacketFramer _framer = new();
     private readonly TimeProvider _time;
     private CancellationTokenSource? _streamCts;
     private DateTimeOffset _poweredOn;
@@ -36,7 +35,7 @@ public sealed class SimulatedMeterConnection : IMeterConnection, IDisposable
 
     public event EventHandler? StateChanged;
     public event EventHandler<DiscoveredMeter>? MeterDiscovered;
-    public event EventHandler<MeterPacket>? PacketReceived;
+    public event EventHandler<ReadOnlyMemory<byte>>? DataReceived;
     public event EventHandler? ConnectionLost;
 
     public Task StartScanAsync(CancellationToken ct = default)
@@ -60,7 +59,6 @@ public sealed class SimulatedMeterConnection : IMeterConnection, IDisposable
         Meter = DemoMeter;
         SetState(ConnectionState.Connecting);
         _poweredOn = _time.GetUtcNow();
-        _framer.Reset();
         _streamCts = new CancellationTokenSource();
         SetState(ConnectionState.Connected);
         _ = StreamAsync(_streamCts.Token);
@@ -118,11 +116,8 @@ public sealed class SimulatedMeterConnection : IMeterConnection, IDisposable
         }
     }
 
-    private void Deliver(ReadOnlySpan<byte> notification)
-    {
-        foreach (var packet in _framer.Push(notification))
-            PacketReceived?.Invoke(this, packet);
-    }
+    private void Deliver(ReadOnlySpan<byte> notification) =>
+        DataReceived?.Invoke(this, notification.ToArray());
 
     private void StopStream()
     {

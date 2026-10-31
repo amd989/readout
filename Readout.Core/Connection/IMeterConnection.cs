@@ -1,3 +1,4 @@
+using Readout.Core.Display;
 using Readout.Core.Protocol;
 
 namespace Readout.Core.Connection;
@@ -12,7 +13,8 @@ public enum ConnectionState
 
 /// <summary>A meter seen while scanning.</summary>
 /// <param name="Id">The platform's id for the device; stable across launches on the same phone.</param>
-public sealed record DiscoveredMeter(string Id, string Name, int Rssi);
+/// <param name="Model">What kind of meter it is, which picks the driver for its data.</param>
+public sealed record DiscoveredMeter(string Id, string Name, int Rssi, MeterModel Model = MeterModel.Eevblog121Gw);
 
 /// <summary>
 /// One way of talking to a meter: Bluetooth on a given platform, or the simulated meter.
@@ -33,8 +35,11 @@ public interface IMeterConnection
     /// <summary>A meter was seen while scanning (again, possibly, with a new signal strength).</summary>
     event EventHandler<DiscoveredMeter>? MeterDiscovered;
 
-    /// <summary>The meter sent a valid packet.</summary>
-    event EventHandler<MeterPacket>? PacketReceived;
+    /// <summary>
+    /// Bytes from the meter, as they arrived: a packet may be split across several of these, or
+    /// several packets may come in one. The session's driver for <see cref="Meter"/> frames them.
+    /// </summary>
+    event EventHandler<ReadOnlyMemory<byte>>? DataReceived;
 
     /// <summary>The link dropped without <see cref="DisconnectAsync"/> being called.</summary>
     event EventHandler? ConnectionLost;
