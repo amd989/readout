@@ -20,6 +20,7 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
 {
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan StopTimeout    = TimeSpan.FromSeconds(3);
+    private const int MaxConnectAttempts = 3;
 
     private readonly BlueZBus _bus;
     private readonly ILogger<BlueZMeterConnection> _logger;
@@ -198,15 +199,32 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
         lock (_gate) _devicePath = devicePath;
 
         await PreferLeAsync(meter.Id, devicePath).ConfigureAwait(false);
-        try
+        await WaitForScanToStopAsync(ct).ConfigureAwait(false);
+        for (var attempt = 1; ; attempt++)
         {
-            await _bus.CallAsync(devicePath, BlueZNames.Device1, "Connect").WaitAsync(ct).ConfigureAwait(false);
-        }
-        catch (DBusErrorReplyException ex) when (ex.ErrorName == "org.bluez.Error.AlreadyConnected") { }
-        catch (DBusErrorReplyException ex) when (ex.ErrorMessage?.StartsWith("br-", StringComparison.Ordinal) == true)
-        {
-            _logger.LogWarning("BlueZ tried Classic Bluetooth for the meter ({Error}), which it doesn't have; run bluetoothd with -E so the app can ask for LE", ex.ErrorMessage);
-            throw;
+            try
+            {
+                await _bus.CallAsync(devicePath, BlueZNames.Device1, "Connect").WaitAsync(ct).ConfigureAwait(false);
+                break;
+            }
+            catch (DBusErrorReplyException ex) when (ex.ErrorName == "org.bluez.Error.AlreadyConnected")
+            {
+                break;
+            }
+            catch (DBusErrorReplyException ex) when (ex.ErrorMessage?.StartsWith("br-", StringComparison.Ordinal) == true)
+            {
+                _logger.LogWarning("BlueZ tried Classic Bluetooth for the meter ({Error}), which it doesn't have; run bluetoothd with -E so the app can ask for LE", ex.ErrorMessage);
+                throw;
+            }
+            // The kernel cancels an LE connect when a scan starts or stops under it (seen on the
+            // Fedora laptop: the scan was still being torn down). Give it a moment and go again.
+            catch (DBusErrorReplyException ex) when (ex.ErrorMessage == "le-connection-abort-by-local" && attempt < MaxConnectAttempts)
+            {
+                _logger.LogInformation("connect: BlueZ aborted it (attempt {Attempt}, adapter discovering: {Discovering}); trying again",
+                    attempt, await IsDiscoveringAsync().ConfigureAwait(false));
+                await Task.Delay(TimeSpan.FromMilliseconds(500 * attempt), ct).ConfigureAwait(false);
+                await WaitForScanToStopAsync(ct).ConfigureAwait(false);
+            }
         }
 
         // BlueZ discovers the meter's GATT database after connecting; its objects appear then.
@@ -264,6 +282,35 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
         if (!BlueZNames.IsLeOnly(addressType, flags))
             _logger.LogWarning("connect {Address}: its advertisement doesn't say LE-only (address {Type}, flags {Flags}), so BlueZ may try Classic Bluetooth",
                 address, addressType ?? "?", flags is { Length: > 0 } ? $"0x{flags[0]:X2}" : "none");
+    }
+
+    /// <summary>
+    /// Waits (up to 2 s) for BlueZ to say the adapter has stopped scanning. StopDiscovery returns
+    /// before the scan is down, and an LE connect started while the kernel is still scanning, or
+    /// while it restarts the scan, is aborted (le-connection-abort-by-local). Another program
+    /// scanning keeps the adapter discovering; then this just says so and goes on.
+    /// </summary>
+    private async Task WaitForScanToStopAsync(CancellationToken ct)
+    {
+        for (var waited = 0; waited < 2000; waited += 100)
+        {
+            if (!await IsDiscoveringAsync().ConfigureAwait(false)) return;
+            await Task.Delay(100, ct).ConfigureAwait(false);
+        }
+        _logger.LogInformation("connect: the adapter is still scanning (another program may be), connecting anyway");
+    }
+
+    private async Task<bool> IsDiscoveringAsync()
+    {
+        try
+        {
+            var value = await _bus.GetPropertyAsync(AdapterPath, BlueZNames.Adapter1, "Discovering").ConfigureAwait(false);
+            return value.Unwrap() is { Type: VariantValueType.Bool } b && b.GetBool();
+        }
+        catch (DBusErrorReplyException)
+        {
+            return false;
+        }
     }
 
     private async Task<bool> ServicesResolvedAsync(string devicePath)
@@ -345,7 +392,7 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
             await task.WaitAsync(StopTimeout).ConfigureAwait(false);
         }
         catch (TimeoutException) { _logger.LogWarning("{What}: no answer after {Seconds:0} s, moving on", what, StopTimeout.TotalSeconds); }
-        catch (Exception ex) { _logger.LogDebug(ex, "{What} failed", what); }
+        catch (Exception ex) { _logger.LogInformation("{What} failed: {Error}", what, ex.Message); }
     }
 
     // ── BlueZ signals (on the bus's thread) ─────────────────────────────────
