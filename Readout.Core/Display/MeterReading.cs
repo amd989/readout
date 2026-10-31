@@ -30,6 +30,12 @@ public sealed record MeterReading
     public required BarGraph Bar { get; init; }
     public required Annunciators Icons { get; init; }
 
+    /// <summary>
+    /// Right after a mode change the meter's display is blank until its first measurement,
+    /// while the packets say 0. Such a reading shows nothing and isn't logged.
+    /// </summary>
+    public bool Blank { get; init; }
+
     public int Serial => Packet.Serial;
 
     /// <summary>The main reading as one line: "-12.106 mV", "OFL kΩ".</summary>

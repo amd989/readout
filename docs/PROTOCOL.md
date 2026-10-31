@@ -145,8 +145,10 @@ MODE step, range and SETUP page:
 - dBm (180) is a live reading of the input in AC V, with the dBm symbol lit.
 - AC+DC on V is sent as main mode 2 (AC voltage) with coupling 3.
 - On the VA position the small display alternates between the current and the voltage.
-- Temperature with no thermocouple: the meter shows OFL, but the packet sends 0 with the
-  overload bit clear.
+- Right after a mode change the meter's display is blank until its first measurement (about
+  two seconds on temperature), but its packets say 0 with the overload bit clear. Nothing in
+  the packet marks it; the app treats a 0 within 2.5 s of a mode change as blank. Temperature
+  with no thermocouple then sends OFL as it should.
 
 ### Setting the clock
 

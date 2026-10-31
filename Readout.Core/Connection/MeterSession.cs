@@ -105,6 +105,10 @@ public sealed class MeterSession
     private static readonly TimeSpan SentKeyEcho = TimeSpan.FromSeconds(1.5);
     private readonly Dictionary<MeterKey, DateTimeOffset> _sentKeys = [];
 
+    /// <summary>How long after a mode change a 0 can be the meter's blank display.</summary>
+    private static readonly TimeSpan BlankAfterModeChange = TimeSpan.FromSeconds(2.5);
+    private DateTimeOffset? _modeChangedAt;
+
     /// <summary>Starts looking for meters.</summary>
     /// <param name="autoConnect">
     /// Connect by itself when the remembered meter shows up. For background reconnects (at
@@ -182,14 +186,28 @@ public sealed class MeterSession
 
     private void OnPacket(MeterPacket packet)
     {
-        var reading = ReadingDecoder.Decode(packet, _time.GetLocalNow(), Latest?.Sub.Label);
+        var now = _time.GetLocalNow();
+        var reading = ReadingDecoder.Decode(packet, now, Latest?.Sub.Label);
         var pressed = Latest is { } previous ? KeyInference.Infer(previous.Packet, packet) : null;
+
+        // After a mode change the meter's display stays blank until it has measured, but its
+        // packets say 0 (a real meter, on temperature, for about two seconds).
+        if (Latest is { } last && (last.Packet.Mode != packet.Mode ||
+            (last.Packet.Coupling == Coupling.AcPlusDc) != (packet.Coupling == Coupling.AcPlusDc)))
+            _modeChangedAt = now;
+        if (_modeChangedAt is { } changed)
+        {
+            if (!packet.MainOverload && packet.MainRawValue == 0 && now - changed < BlankAfterModeChange)
+                reading = reading with { Blank = true, MainText = "", MainNegative = false, MainUnit = "", Value = null, BaseValue = null };
+            else
+                _modeChangedAt = null;
+        }
         Latest = reading;
         if (pressed is { } press && !SentRecently(press.Key))
             KeyPressed?.Invoke(this, press);
         if (packet.SubMode == MeterMode.Battery && !packet.SubOverload)
             BatteryVolts = packet.SubRawValue / Math.Pow(10, packet.SubDecimals);
-        if (IsLogging)
+        if (IsLogging && !reading.Blank)
             Log.Add(reading);
         ReadingReceived?.Invoke(this, reading);
     }

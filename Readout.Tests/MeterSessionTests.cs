@@ -110,6 +110,37 @@ public sealed class MeterSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task ZeroRightAfterAModeChange_IsTheBlankDisplay()
+    {
+        await _session.ConnectAsync(Meter);
+        _bluetooth.Send(new PacketBuilder { Mode = MeterMode.DcMillivolts, MainRawValue = 123 }.BuildPacket());
+
+        // The meter's blank display while it first measures, then OFL (no thermocouple).
+        _bluetooth.Send(new PacketBuilder { Mode = MeterMode.Temperature, MainCelsius = true }.BuildPacket());
+        Assert.True(_session.Latest!.Blank);
+        Assert.Equal("", _session.Latest.MainText);
+        Assert.Equal(1, _session.Log.Count);
+
+        _bluetooth.Send(new PacketBuilder { Mode = MeterMode.Temperature, MainCelsius = true, MainOverload = true }.BuildPacket());
+        Assert.False(_session.Latest!.Blank);
+        Assert.Equal("OFL", _session.Latest.MainText);
+    }
+
+    [Fact]
+    public async Task ZeroLongAfterAModeChange_IsAReading()
+    {
+        await _session.ConnectAsync(Meter);
+        _bluetooth.Send(new PacketBuilder { Mode = MeterMode.DcMillivolts, MainRawValue = 123 }.BuildPacket());
+        _bluetooth.Send(new PacketBuilder { Mode = MeterMode.DcVolts }.BuildPacket());
+        Assert.True(_session.Latest!.Blank);
+
+        _time.Advance(TimeSpan.FromSeconds(3));
+        _bluetooth.Send(new PacketBuilder { Mode = MeterMode.DcVolts }.BuildPacket());
+        Assert.False(_session.Latest!.Blank);
+        Assert.Equal(0, _session.Latest.Value);
+    }
+
+    [Fact]
     public async Task HoldPressedOnTheMeter_IsReported()
     {
         var presses = new List<MeterKeyPress>();
