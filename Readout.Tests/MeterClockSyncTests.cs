@@ -62,7 +62,7 @@ public sealed class MeterClockSyncTests : IDisposable
 
         await Sync().SyncAsync(ct: TestContext.Current.CancellationToken);
 
-        Assert.Equal(MeterMode.SetupTemperatureC, _session.Latest!.Packet.SubMode);
+        Assert.Equal(MeterMode.SetupTemperatureC, _session.Latest!.Packet!.SubMode);
     }
 
     [Fact]

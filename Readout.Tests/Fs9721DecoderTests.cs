@@ -1,3 +1,4 @@
+using Readout.Core.Display;
 using Readout.Core.Fs9721;
 using Readout.Core.Protocol;
 
@@ -7,27 +8,31 @@ public class Fs9721DecoderTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 31, 12, 0, 0, TimeSpan.Zero);
 
-    private static Fs9721Reading Decode(string hex)
+    private static MeterReading Decode(string hex)
     {
         Assert.True(Fs9721Frame.TryParseHex(hex, out var frame), hex);
         return Fs9721Decoder.Decode(frame, Now);
     }
 
     /// <summary>What each label in the capture file was measuring.</summary>
-    private static Fs9721Function ExpectedFunction(string label) => label switch
+    private static MeterMode ExpectedMode(string label) => label switch
     {
-        _ when label.StartsWith("mVDC", StringComparison.Ordinal) || label.StartsWith("VDC", StringComparison.Ordinal) => Fs9721Function.DcVoltage,
-        _ when label.StartsWith("VAC", StringComparison.Ordinal) => Fs9721Function.AcVoltage,
-        _ when label.StartsWith("OHM/Diode", StringComparison.Ordinal) => Fs9721Function.Diode,
-        _ when label.StartsWith("OHM/Continuity", StringComparison.Ordinal) => Fs9721Function.Continuity,
-        _ when label.StartsWith("OHM", StringComparison.Ordinal) => Fs9721Function.Resistance,
-        _ when label.StartsWith("CAP", StringComparison.Ordinal) => Fs9721Function.Capacitance,
-        _ when label.StartsWith("hfe", StringComparison.Ordinal) => Fs9721Function.Hfe,
-        _ when label.StartsWith("Temp", StringComparison.Ordinal) => Fs9721Function.Temperature,
-        _ when label.StartsWith("Freq", StringComparison.Ordinal) => Fs9721Function.Frequency,
-        _ when label.StartsWith("Duty", StringComparison.Ordinal) => Fs9721Function.Duty,
-        "uA" or "mA" or "A" => Fs9721Function.DcCurrent,
-        _ => throw new InvalidOperationException($"No expected function for '{label}'"),
+        _ when label.StartsWith("mVDC", StringComparison.Ordinal) => MeterMode.DcMillivolts,
+        _ when label.StartsWith("VDC", StringComparison.Ordinal) => MeterMode.DcVolts,
+        _ when label.StartsWith("VAC", StringComparison.Ordinal) => MeterMode.AcVolts,
+        _ when label.StartsWith("OHM/Diode", StringComparison.Ordinal) => MeterMode.Diode,
+        _ when label.StartsWith("OHM/Continuity", StringComparison.Ordinal) => MeterMode.Continuity,
+        _ when label.StartsWith("OHM", StringComparison.Ordinal) => MeterMode.Resistance,
+        _ when label.StartsWith("CAP", StringComparison.Ordinal) => MeterMode.Capacitance,
+        _ when label.StartsWith("hfe", StringComparison.Ordinal) => MeterMode.Hfe,
+        _ when label.StartsWith("Temp F", StringComparison.Ordinal) => MeterMode.TemperatureF,
+        _ when label.StartsWith("Temp C", StringComparison.Ordinal) => MeterMode.TemperatureC,
+        _ when label.StartsWith("Freq", StringComparison.Ordinal) => MeterMode.Frequency,
+        _ when label.StartsWith("Duty", StringComparison.Ordinal) => MeterMode.Duty,
+        "uA" => MeterMode.DcMicroamps,
+        "mA" => MeterMode.DcMilliamps,
+        "A" => MeterMode.DcAmps,
+        _ => throw new InvalidOperationException($"No expected mode for '{label}'"),
     };
 
     private static IEnumerable<(string Label, string Hex)> CapturedFrames()
@@ -51,10 +56,11 @@ public class Fs9721DecoderTests
         foreach (var (label, hex) in frames)
         {
             var r = Decode(hex);
-            Assert.Equal(ExpectedFunction(label), r.Function);
+            Assert.Equal(ExpectedMode(label), r.Mode);
             Assert.DoesNotContain('?', r.MainText);
             Assert.Equal(r.MainOverload, r.Value is null);
-            Assert.NotEqual("Unknown", r.ModeName);
+            Assert.Equal(MeterModel.Fs9721, r.Model);
+            Assert.Equal(hex.Replace(" ", ""), Convert.ToHexString(r.Raw.Span), ignoreCase: true);
         }
     }
 
@@ -88,16 +94,32 @@ public class Fs9721DecoderTests
     }
 
     [Fact]
-    public void Decode_Hfe_HasNoMatchingModeOrUnit()
+    public void Decode_Hfe_HasItsOwnModeAndNoUnit()
     {
         var r = Decode("15 27 3d 47 5d 60 75 83 9f a0 b0 c0 d0 e2");
 
-        Assert.Equal(Fs9721Function.Hfe, r.Function);
-        Assert.Null(r.Mode);
+        Assert.Equal(MeterMode.Hfe, r.Mode);
         Assert.Equal("Transistor gain", r.ModeName);
         Assert.Equal("0019 hFE", r.MainLine);
         Assert.Equal(19.0, r.BaseValue);
         Assert.Equal("", r.BaseUnit);
+    }
+
+    [Fact]
+    public void Readings_LogAndRoundTripThroughCsv()
+    {
+        var log = new Readout.Core.Logging.MeasurementLog();
+        log.Add(Decode("13 20 35 47 5e 69 75 82 97 a4 b0 c8 d0 e8"));
+        log.Add(Decode("15 27 3d 47 5d 60 75 83 9f a0 b0 c0 d0 e2"));
+
+        var csv = new StringWriter();
+        Readout.Core.Logging.SampleCsv.Write(log.Samples, csv);
+        var back = Readout.Core.Logging.SampleCsv.Read(new StringReader(csv.ToString()));
+
+        Assert.Equal([MeterMode.Capacitance, MeterMode.Hfe], back.Select(s => s.Mode));
+        Assert.Equal(16.74e-9, back[0].Value!.Value, 15);
+        Assert.Equal(("F", "16.74 nF", ""), (back[0].Unit, back[0].Display, back[0].Sub));
+        Assert.Equal(("", "0019 hFE"), (back[1].Unit, back[1].Display));
     }
 
     [Theory]

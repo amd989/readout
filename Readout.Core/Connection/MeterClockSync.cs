@@ -111,7 +111,7 @@ public sealed class MeterClockSync
 
     private MeterPacket Latest() =>
         _session.State == ConnectionState.Connected && _session.Latest is { } reading
-            ? reading.Packet
+            ? reading.Packet ?? throw new MeterClockSyncException("This meter has no clock to set.")
             : throw new MeterClockSyncException("Connect to the meter first.");
 
     private void CheckStill(MeterMode mode)

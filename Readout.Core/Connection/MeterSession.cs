@@ -188,12 +188,12 @@ public sealed class MeterSession
     {
         var now = _time.GetLocalNow();
         var reading = ReadingDecoder.Decode(packet, now, Latest?.Sub.Label);
-        var pressed = Latest is { } previous ? KeyInference.Infer(previous.Packet, packet) : null;
+        var pressed = Latest?.Packet is { } previous ? KeyInference.Infer(previous, packet) : null;
 
         // After a mode change the meter's display stays blank until it has measured, but its
         // packets say 0 (a real meter, on temperature, for about two seconds).
-        if (Latest is { } last && (last.Packet.Mode != packet.Mode ||
-            (last.Packet.Coupling == Coupling.AcPlusDc) != (packet.Coupling == Coupling.AcPlusDc)))
+        if (Latest?.Packet is { } last && (last.Mode != packet.Mode ||
+            (last.Coupling == Coupling.AcPlusDc) != (packet.Coupling == Coupling.AcPlusDc)))
             _modeChangedAt = now;
         if (_modeChangedAt is { } changed)
         {

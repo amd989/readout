@@ -4,61 +4,9 @@ using Readout.Core.Protocol;
 
 namespace Readout.Core.Fs9721;
 
-/// <summary>What an FS9721 meter is measuring, worked out from the LCD's unit symbols.</summary>
-public enum Fs9721Function
-{
-    Unknown,
-    DcVoltage,
-    AcVoltage,
-    DcCurrent,
-    AcCurrent,
-    Resistance,
-    Continuity,
-    Diode,
-    Capacitance,
-    Frequency,
-    Duty,
-    Temperature,
-    /// <summary>Transistor gain, from the hFE socket.</summary>
-    Hfe,
-}
-
-/// <summary>What an FS9721 meter's LCD shows for one frame.</summary>
-public sealed record Fs9721Reading
-{
-    public required Fs9721Frame Frame { get; init; }
-    public required DateTimeOffset ReceivedAt { get; init; }
-
-    public required Fs9721Function Function { get; init; }
-    /// <summary>The 121GW mode that measures the same thing; null for hFE and unknown functions.</summary>
-    public required MeterMode? Mode { get; init; }
-    /// <summary>"DC voltage", "Resistance"…, named as for the 121GW.</summary>
-    public required string ModeName { get; init; }
-
-    /// <summary>The digits as the LCD shows them, leading zeros and decimal point included ("04.98"), or "OL".</summary>
-    public required string MainText { get; init; }
-    public required bool MainNegative { get; init; }
-    public required bool MainOverload { get; init; }
-    /// <summary>The unit next to the digits ("mV", "kΩ", "°C", "hFE").</summary>
-    public required string MainUnit { get; init; }
-
-    /// <summary>The reading in <see cref="MainUnit"/>; null on overload or a digit that isn't one.</summary>
-    public required double? Value { get; init; }
-    /// <summary>The reading in <see cref="BaseUnit"/>; null when <see cref="Value"/> is.</summary>
-    public required double? BaseValue { get; init; }
-    /// <summary>The SI unit for logging and graphs ("V", "Ω", "°C"; empty for hFE).</summary>
-    public required string BaseUnit { get; init; }
-
-    public required Annunciators Icons { get; init; }
-
-    /// <summary>The reading as one line: "-12.34 mV", "OL MΩ".</summary>
-    public string MainLine =>
-        $"{(MainNegative && !MainOverload ? "-" : "")}{MainText} {MainUnit}".TrimEnd();
-}
-
 /// <summary>
 /// Decodes FS9721 frames into what the LCD shows. Each frame is the LCD's segment map, so this
-/// reads the digits back from their segments and the function from the unit symbols.
+/// reads the digits back from their segments and the mode from the unit symbols.
 /// </summary>
 /// <remarks>
 /// Byte layout (bit 3 to bit 0): byte 0 AC, DC, AUTO, RS232; bytes 1–8 four digits, two bytes
@@ -76,7 +24,7 @@ public static class Fs9721Decoder
     public static readonly IReadOnlyList<string> DefaultUserSymbols = ["°F", "hFE", "°C", ""];
 
     /// <param name="userSymbols">What the meter's byte-13 symbols mean, bit 0 first; see <see cref="DefaultUserSymbols"/>.</param>
-    public static Fs9721Reading Decode(Fs9721Frame frame, DateTimeOffset receivedAt, IReadOnlyList<string>? userSymbols = null)
+    public static MeterReading Decode(Fs9721Frame frame, DateTimeOffset receivedAt, IReadOnlyList<string>? userSymbols = null)
     {
         userSymbols ??= DefaultUserSymbols;
         var symbol = UserSymbol(frame, userSymbols);
@@ -84,66 +32,38 @@ public static class Fs9721Decoder
         var (text, overload) = Digits(frame);
         var negative = frame.Bit(1, 3);
         var (prefix, multiplier) = Prefix(frame);
+        var mode = Mode(frame, symbol, prefix);
 
-        var volts = frame.Bit(12, 2);
-        var amps = frame.Bit(12, 3);
-        var ohms = frame.Bit(11, 2);
-        var ac = frame.Bit(0, 3);
-
-        // The hFE and temperature positions light DC and nothing else, so their symbol comes first.
-        var function = symbol switch
+        var baseUnit = mode switch
         {
-            "hFE" => Fs9721Function.Hfe,
-            "°C" or "°F" => Fs9721Function.Temperature,
-            _ when frame.Bit(9, 0) => Fs9721Function.Diode,
-            _ when ohms && frame.Bit(10, 0) => Fs9721Function.Continuity,
-            _ when ohms => Fs9721Function.Resistance,
-            _ when frame.Bit(11, 3) => Fs9721Function.Capacitance,
-            _ when frame.Bit(12, 1) => Fs9721Function.Frequency,
-            _ when frame.Bit(10, 2) => Fs9721Function.Duty,
-            _ when amps => ac ? Fs9721Function.AcCurrent : Fs9721Function.DcCurrent,
-            _ when volts => ac ? Fs9721Function.AcVoltage : Fs9721Function.DcVoltage,
-            _ => Fs9721Function.Unknown,
-        };
-
-        var baseUnit = function switch
-        {
-            Fs9721Function.DcVoltage or Fs9721Function.AcVoltage or Fs9721Function.Diode => "V",
-            Fs9721Function.DcCurrent or Fs9721Function.AcCurrent => "A",
-            Fs9721Function.Resistance or Fs9721Function.Continuity => "Ω",
-            Fs9721Function.Capacitance => "F",
-            Fs9721Function.Frequency => "Hz",
-            Fs9721Function.Duty => "%",
-            Fs9721Function.Temperature => symbol,
+            MeterMode.DcVolts or MeterMode.AcVolts or MeterMode.DcMillivolts or MeterMode.AcMillivolts
+                or MeterMode.Diode => "V",
+            MeterMode.DcMicroamps or MeterMode.AcMicroamps or MeterMode.DcMilliamps or MeterMode.AcMilliamps
+                or MeterMode.DcAmps or MeterMode.AcAmps => "A",
+            MeterMode.Resistance or MeterMode.Continuity => "Ω",
+            MeterMode.Capacitance => "F",
+            MeterMode.Frequency => "Hz",
+            MeterMode.Duty => "%",
+            MeterMode.TemperatureC or MeterMode.TemperatureF => symbol,
             _ => "",
         };
-        // hFE and temperature have no prefix; the others show the one lit next to the unit.
-        var unit = function switch
-        {
-            Fs9721Function.Hfe => "hFE",
-            Fs9721Function.Temperature or Fs9721Function.Duty => baseUnit,
-            _ => prefix + baseUnit,
-        };
-        if (function is Fs9721Function.Hfe or Fs9721Function.Temperature or Fs9721Function.Duty)
+        // hFE, temperature and duty never take a prefix; the others show the one lit next to the unit.
+        var plain = mode is MeterMode.Hfe or MeterMode.TemperatureC or MeterMode.TemperatureF or MeterMode.Duty;
+        var unit = mode == MeterMode.Hfe ? "hFE" : plain ? baseUnit : prefix + baseUnit;
+        if (plain)
             multiplier = 1;
 
         double? value = null;
         if (!overload && double.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var magnitude))
             value = negative ? -magnitude : magnitude;
 
-        var mode = Mode(function, prefix, ac, symbol);
-        return new Fs9721Reading
+        return new MeterReading
         {
-            Frame = frame,
+            Model = MeterModel.Fs9721,
+            Raw = frame.Bytes.ToArray(),
             ReceivedAt = receivedAt,
-            Function = function,
             Mode = mode,
-            ModeName = function switch
-            {
-                Fs9721Function.Hfe => "Transistor gain",
-                Fs9721Function.Unknown => "Unknown",
-                _ => ReadingDecoder.ModeName(mode!.Value),
-            },
+            ModeName = ReadingDecoder.ModeName(mode),
             MainText = overload ? "OL" : text,
             MainNegative = negative,
             MainOverload = overload,
@@ -151,9 +71,11 @@ public static class Fs9721Decoder
             Value = value,
             BaseValue = value * multiplier,
             BaseUnit = baseUnit,
+            Sub = SubDisplay.None,
+            Bar = BarGraph.Off,
             Icons = new Annunciators
             {
-                Ac = ac,
+                Ac = frame.Bit(0, 3),
                 Dc = frame.Bit(0, 2),
                 Auto = frame.Bit(0, 1),
                 Hold = frame.Bit(11, 0),
@@ -162,6 +84,46 @@ public static class Fs9721Decoder
                 Beep = frame.Bit(10, 0),
                 Diode = frame.Bit(9, 0),
             },
+        };
+    }
+
+    /// <summary>
+    /// The mode, from the unit symbols. The hFE and temperature positions light DC and one of the
+    /// maker's symbols, so that symbol is checked first. Prefixes pick the 121GW's separate
+    /// millivolt and current modes, so names, logs and graphs match.
+    /// </summary>
+    private static MeterMode Mode(Fs9721Frame frame, string symbol, string prefix)
+    {
+        var ac = frame.Bit(0, 3);
+        var ohms = frame.Bit(11, 2);
+        return symbol switch
+        {
+            "hFE" => MeterMode.Hfe,
+            "°C" => MeterMode.TemperatureC,
+            "°F" => MeterMode.TemperatureF,
+            _ when frame.Bit(9, 0) => MeterMode.Diode,
+            _ when ohms && frame.Bit(10, 0) => MeterMode.Continuity,
+            _ when ohms => MeterMode.Resistance,
+            _ when frame.Bit(11, 3) => MeterMode.Capacitance,
+            _ when frame.Bit(12, 1) => MeterMode.Frequency,
+            _ when frame.Bit(10, 2) => MeterMode.Duty,
+            _ when frame.Bit(12, 3) => (prefix, ac) switch
+            {
+                ("µ", false) => MeterMode.DcMicroamps,
+                ("µ", true) => MeterMode.AcMicroamps,
+                ("m", false) => MeterMode.DcMilliamps,
+                ("m", true) => MeterMode.AcMilliamps,
+                (_, false) => MeterMode.DcAmps,
+                (_, true) => MeterMode.AcAmps,
+            },
+            _ when frame.Bit(12, 2) => (prefix, ac) switch
+            {
+                ("m", false) => MeterMode.DcMillivolts,
+                ("m", true) => MeterMode.AcMillivolts,
+                (_, false) => MeterMode.DcVolts,
+                (_, true) => MeterMode.AcVolts,
+            },
+            _ => MeterMode.Unknown,
         };
     }
 
@@ -220,28 +182,4 @@ public static class Fs9721Decoder
         }
         return "";
     }
-
-    /// <summary>The 121GW mode for the same measurement, so names, logging and graphs can be shared.</summary>
-    private static MeterMode? Mode(Fs9721Function function, string prefix, bool ac, string symbol) => function switch
-    {
-        Fs9721Function.DcVoltage => prefix == "m" ? MeterMode.DcMillivolts : MeterMode.DcVolts,
-        Fs9721Function.AcVoltage => prefix == "m" ? MeterMode.AcMillivolts : MeterMode.AcVolts,
-        Fs9721Function.DcCurrent or Fs9721Function.AcCurrent => (prefix, ac) switch
-        {
-            ("µ", false) => MeterMode.DcMicroamps,
-            ("µ", true) => MeterMode.AcMicroamps,
-            ("m", false) => MeterMode.DcMilliamps,
-            ("m", true) => MeterMode.AcMilliamps,
-            (_, false) => MeterMode.DcAmps,
-            (_, true) => MeterMode.AcAmps,
-        },
-        Fs9721Function.Resistance => MeterMode.Resistance,
-        Fs9721Function.Continuity => MeterMode.Continuity,
-        Fs9721Function.Diode => MeterMode.Diode,
-        Fs9721Function.Capacitance => MeterMode.Capacitance,
-        Fs9721Function.Frequency => MeterMode.Frequency,
-        Fs9721Function.Duty => MeterMode.Duty,
-        Fs9721Function.Temperature => symbol == "°F" ? MeterMode.TemperatureF : MeterMode.TemperatureC,
-        _ => null,
-    };
 }

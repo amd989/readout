@@ -116,7 +116,7 @@ public sealed class MeterTools(
             rssi,
             rssi is { } dbm ? SignalQuality.Describe(dbm) : null,
             session.BatteryVolts,
-            session.Latest?.Packet.LowBattery ?? false,
+            session.Latest?.Icons.LowBattery ?? false,
             session.IsLogging,
             session.Log.Count,
             reading));
@@ -288,7 +288,7 @@ public sealed class MeterTools(
         r.Sub.Text.Length > 0 ? r.Sub.Line : null,
         r.Sub.Label,
         Symbols(r.Icons),
-        Convert.ToHexString(r.Packet.Bytes));
+        Convert.ToHexString(r.Raw.Span));
 
     private static List<string> Symbols(Annunciators i)
     {

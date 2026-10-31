@@ -12,7 +12,12 @@ public static class ReadingDecoder
     private const int LcdDigits = 5;
 
     /// <summary>"DC voltage", "Resistance"… for a main mode.</summary>
-    public static string ModeName(MeterMode mode) => ModeInfo.For(mode)?.Name ?? $"Mode {(int)mode}";
+    public static string ModeName(MeterMode mode) => mode switch
+    {
+        MeterMode.Hfe => "Transistor gain",
+        MeterMode.Unknown => "Unknown",
+        _ => ModeInfo.For(mode)?.Name ?? $"Mode {(int)mode}",
+    };
 
     /// <param name="previousSubLabel">
     /// The SETUP page the last packet showed, if any. A few pages are sent without a page
@@ -55,6 +60,8 @@ public static class ReadingDecoder
 
         return new MeterReading
         {
+            Model = MeterModel.Eevblog121Gw,
+            Raw = packet.Bytes.ToArray(),
             Packet = packet,
             ReceivedAt = receivedAt,
             Mode = mode,

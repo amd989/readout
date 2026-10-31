@@ -75,7 +75,7 @@ public sealed partial class MeterViewModel : ObservableObject
         HasSignal = _session.SignalStrength is not null;
 
         var parts = new List<string>();
-        if (_session.Latest?.Packet.LowBattery == true)
+        if (_session.Latest?.Icons.LowBattery == true)
             parts.Add("Battery low");
         else if (_session.BatteryVolts is { } volts)
             parts.Add(string.Format(CultureInfo.CurrentCulture, "Battery {0:0.00} V", volts));
