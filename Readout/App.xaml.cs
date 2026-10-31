@@ -45,7 +45,12 @@ public partial class App : Application
             MinimumWidth = MinimumWindowSize.Width,
             MinimumHeight = MinimumWindowSize.Height,
             Width = WindowSize.Width,
+#if LINUX
+            // Within a small screen (a 1280×800 laptop cut the page off).
+            Height = Readout.Linux.WindowFit.Height(WindowSize.Height, MinimumWindowSize.Height),
+#else
             Height = WindowSize.Height,
+#endif
         };
         window.Destroying += (_, _) => FlushRecording();
         return window;
