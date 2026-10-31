@@ -4,9 +4,17 @@
 // forwards the bytes over Bluetooth LE as they come. The Readout app frames and decodes them,
 // so this stays the same for any chip that only sends. The Bluetooth layout matches
 // Readout.Core/Protocol/BridgeBluetooth.cs.
+//
+// It turns on and off with the meter: when no data has arrived for SLEEP_AFTER_S seconds (the
+// meter is off, or its serial output is), it goes to deep sleep, and the next change on the
+// input line wakes it.
 
 #include <Arduino.h>
 #include <NimBLEDevice.h>
+#include <esp_sleep.h>
+#if CONFIG_IDF_TARGET_ESP32
+#include <driver/rtc_io.h>
+#endif
 
 #ifndef METER_RX_PIN
 #define METER_RX_PIN 16
@@ -15,7 +23,10 @@
 #define METER_TX_PIN 17  // Unused (the meter only sends), but the UART needs a pin.
 #endif
 #ifndef METER_RX_INVERTED
-#define METER_RX_INVERTED 1
+#define METER_RX_INVERTED 0
+#endif
+#ifndef SLEEP_AFTER_S
+#define SLEEP_AFTER_S 10  // 0 never sleeps
 #endif
 #ifndef METER_SYMBOLS
 #define METER_SYMBOLS "°F,hFE,°C,"
@@ -27,7 +38,7 @@
 #define LED_ACTIVE_LOW 0
 #endif
 
-static const char *FIRMWARE_VERSION = "0.1.0";
+static const char *FIRMWARE_VERSION = "0.2.0";
 static const char *CHIP = "FS9721";
 
 // Must match BridgeBluetooth in the app.
@@ -64,6 +75,40 @@ static void reportQuiet() {
                                          : "changing, but no bytes: check the inversion setting";
   Serial.printf("no data for %lu s; GPIO %d is %s (%lu%% high)\n", (unsigned long)(QUIET_REPORT_MS / 1000),
                 METER_RX_PIN, level, (unsigned long)(total ? samplesHigh * 100 / total : 0));
+}
+
+static void setLed(bool on);
+
+static const char *wakeReason() {
+  switch (esp_sleep_get_wakeup_cause()) {
+    case ESP_SLEEP_WAKEUP_EXT0:
+    case ESP_SLEEP_WAKEUP_GPIO:
+      return "woken by the meter";
+    case ESP_SLEEP_WAKEUP_UNDEFINED:
+      return "powered on";
+    default:
+      return "woken";
+  }
+}
+
+// Deep sleep until the input line changes. Usually it rests high (the meter idles high, or is
+// off with the optocoupler's pull-up), and the next start bit wakes it. Wired directly, a meter
+// that's off holds the line low instead, so then it waits for the line to go high (the meter
+// switching on). Either way it wakes on whatever comes next.
+static void sleepUntilTheMeterTalks() {
+  int level = digitalRead(METER_RX_PIN);
+  Serial.printf("no data for %d s: sleeping until GPIO %d goes %s\n", SLEEP_AFTER_S, METER_RX_PIN,
+                level ? "low" : "high");
+  Serial.flush();
+  setLed(false);
+  meter.end();
+#if CONFIG_IDF_TARGET_ESP32
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)METER_RX_PIN, level ? 0 : 1);
+#else
+  esp_deep_sleep_enable_gpio_wakeup(1ULL << METER_RX_PIN,
+                                    level ? ESP_GPIO_WAKEUP_GPIO_LOW : ESP_GPIO_WAKEUP_GPIO_HIGH);
+#endif
+  esp_deep_sleep_start();
 }
 
 static void setLed(bool on) {
@@ -142,9 +187,14 @@ void setup() {
   if (LED_PIN >= 0) pinMode(LED_PIN, OUTPUT);
   setLed(false);
 
+#if CONFIG_IDF_TARGET_ESP32
+  // The wake-up left the pin as an RTC pad; hand it back to the UART.
+  rtc_gpio_deinit((gpio_num_t)METER_RX_PIN);
+#endif
   meter.begin(METER_BAUD, SERIAL_8N1, METER_RX_PIN, METER_TX_PIN, METER_RX_INVERTED != 0);
-  Serial.printf("Readout bridge %s: %s on GPIO %d, %s\n", FIRMWARE_VERSION, CHIP, METER_RX_PIN,
-                METER_RX_INVERTED ? "through an optocoupler (inverted)" : "wired directly");
+  Serial.printf("Readout bridge %s (%s): %s on GPIO %d%s\n", FIRMWARE_VERSION, wakeReason(), CHIP,
+                METER_RX_PIN, METER_RX_INVERTED ? ", inverted" : "");
+  lastByteAt = millis();
 
   startBluetooth();
 }
@@ -171,6 +221,8 @@ void loop() {
   }
 
   if (pendingLength > 0 && millis() - lastByteAt >= FRAME_GAP_MS) sendPending();
+
+  if (SLEEP_AFTER_S > 0 && millis() - lastByteAt >= SLEEP_AFTER_S * 1000UL) sleepUntilTheMeterTalks();
 
   if (ledOffAt != 0 && (int32_t)(millis() - ledOffAt) >= 0) {
     setLed(false);
