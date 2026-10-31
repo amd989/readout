@@ -131,6 +131,25 @@ public sealed class MeterSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task Capabilities_FollowTheConnectedMeter()
+    {
+        Assert.True(_session.Capabilities.RemoteKeys);
+
+        await _session.ConnectAsync(Bridge);
+        Assert.Equal(MeterModel.Fs9721, _session.Model);
+        Assert.Equal(MeterCapabilities.Fs9721, _session.Capabilities);
+
+        // Keys go nowhere: the bridge only listens to its meter.
+        await _session.SendKeyAsync(MeterKey.Hold);
+        Assert.Empty(_bluetooth.Keys);
+
+        // After disconnecting, the last reading's meter still decides (the page keeps its LCD).
+        _bluetooth.Send(Fs9721Frame);
+        await _session.DisconnectAsync();
+        Assert.Equal(MeterModel.Fs9721, _session.Model);
+    }
+
+    [Fact]
     public async Task SwitchingMeterModels_UsesEachModelsDriver()
     {
         await _session.ConnectAsync(Bridge);

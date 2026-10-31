@@ -16,13 +16,8 @@ public partial class MeterPage : ContentPage
         Lcd.Drawable = _lcd;
         Trend.Samples = _viewModel.TrendSamples;   // a recording restored from last time
 
-        // The LCD keeps its shape at any width.
-        Lcd.SizeChanged += (_, _) =>
-        {
-            var height = Math.Round(Lcd.Width / LcdDrawable.AspectRatio);
-            if (Lcd.Width > 0 && Math.Abs(Lcd.HeightRequest - height) > 1)
-                Lcd.HeightRequest = height;
-        };
+        // The LCD keeps its shape at any width (and each meter's LCD has its own).
+        Lcd.SizeChanged += (_, _) => FitLcd();
 
         // Stacked or side by side, depending on the window's shape.
         Scroller.SizeChanged += (_, _) => ApplyLayout();
@@ -45,9 +40,21 @@ public partial class MeterPage : ContentPage
         _viewModel.DisplayChanged += (_, _) =>
         {
             _lcd.Reading = _viewModel.Reading;
+            if (_lcd.Model != _viewModel.Model)
+            {
+                _lcd.Model = _viewModel.Model;
+                FitLcd();
+            }
             Lcd.Invalidate();
         };
         _viewModel.TrendChanged += (_, _) => Trend.Samples = _viewModel.TrendSamples;
+    }
+
+    private void FitLcd()
+    {
+        var height = Math.Round(Lcd.Width / _lcd.AspectRatio);
+        if (Lcd.Width > 0 && Math.Abs(Lcd.HeightRequest - height) > 1)
+            Lcd.HeightRequest = height;
     }
 
     /// <summary>The meter column's narrowest width in two columns: about a phone's, where the buttons' labels fit.</summary>

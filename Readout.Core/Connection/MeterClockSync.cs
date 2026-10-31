@@ -109,10 +109,14 @@ public sealed class MeterClockSync
         await _wait(after, ct).ConfigureAwait(false);
     }
 
-    private MeterPacket Latest() =>
-        _session.State == ConnectionState.Connected && _session.Latest is { } reading
-            ? reading.Packet ?? throw new MeterClockSyncException("This meter has no clock to set.")
-            : throw new MeterClockSyncException("Connect to the meter first.");
+    private MeterPacket Latest()
+    {
+        if (_session.State != ConnectionState.Connected)
+            throw new MeterClockSyncException("Connect to the meter first.");
+        if (!_session.Capabilities.ClockSync)
+            throw new MeterClockSyncException("This meter has no clock to set.");
+        return _session.Latest?.Packet ?? throw new MeterClockSyncException("Connect to the meter first.");
+    }
 
     private void CheckStill(MeterMode mode)
     {

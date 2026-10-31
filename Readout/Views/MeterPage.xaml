@@ -76,9 +76,10 @@
 
                 <!-- The meter's buttons, labelled as on the meter (and its manual): above a button, what
                      it does in some modes; right under it, what holding it does. The meter's backlight
-                     label (hold MODE) is left out: with the app you're looking at the phone. -->
+                     label (hold MODE) is left out: with the app you're looking at the phone. Hidden for
+                     meters that can't be pressed from the app (those behind a bridge). -->
                 <Grid x:Name="KeyGrid" ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8"
-                      IsEnabled="{Binding IsConnected}">
+                      IsEnabled="{Binding IsConnected}" IsVisible="{Binding HasRemoteKeys}">
                     <HorizontalStackLayout Grid.Row="0" Grid.Column="0" HorizontalOptions="Center" Spacing="3">
                         <Label Text="15V" Style="{StaticResource KeyCaption}" />
                         <drawing:DiodeView WidthRequest="16" HeightRequest="9" VerticalOptions="End" Margin="0,0,0,3"

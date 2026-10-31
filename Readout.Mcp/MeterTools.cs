@@ -25,10 +25,12 @@ public sealed class MeterTools(
     public TimeSpan SettleTime { get; init; } = TimeSpan.FromMilliseconds(800);
 
     public const string Instructions =
-        "Tools for an EEVblog 121GW multimeter connected to the Readout app over Bluetooth. " +
+        "Tools for a multimeter connected to the Readout app over Bluetooth: an EEVblog 121GW, or another meter " +
+        "through a Readout bridge (get_status says which). " +
         "get_reading returns what the meter shows right now; values are also given in SI base units. " +
         "The dial on the meter picks the measurement group (V, mV, Hz, Ω, A…) and can only be turned by hand; " +
-        "press_button MODE cycles within the dial position (for example DC, AC, AC+DC on V). " +
+        "on a 121GW, press_button MODE cycles within the dial position (for example DC, AC, AC+DC on V). " +
+        "Meters behind a bridge only send readings: press_button and sync_clock don't work with them. " +
         "The app logs every reading while connected; get_recent_readings and save_session work on that log.";
 
     public IReadOnlyList<McpServerTool> CreateTools() =>
@@ -112,6 +114,8 @@ public sealed class MeterTools(
         return McpResultJson.Serialize(new StatusResult(
             session.State.ToString(),
             session.Meter?.Name,
+            session.Model == MeterModel.Fs9721 ? "FS9721" : "121GW",
+            session.Capabilities.RemoteKeys,
             session.IsDemo,
             rssi,
             rssi is { } dbm ? SignalQuality.Describe(dbm) : null,
@@ -167,6 +171,8 @@ public sealed class MeterTools(
         {
             if (session.State != ConnectionState.Connected)
                 throw new McpException("No meter is connected. Connect one in the Readout app first.");
+            if (!session.Capabilities.RemoteKeys)
+                throw new McpException($"{session.Meter?.Name ?? "This meter"} can't be controlled from the app: its buttons work only on the meter itself.");
             await session.SendKeyAsync(key, longPress, ct);
             return true;
         });

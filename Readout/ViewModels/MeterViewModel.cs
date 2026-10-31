@@ -93,6 +93,13 @@ public sealed partial class MeterViewModel : ObservableObject
 
     public MeterReading? Reading => _session.Latest;
 
+    /// <summary>The kind of meter, which picks the LCD's layout.</summary>
+    public MeterModel Model => _session.Model;
+
+    /// <summary>The meter's buttons can be pressed from the app (a 121GW; not a meter behind a bridge).</summary>
+    [ObservableProperty]
+    private bool _hasRemoteKeys = true;
+
     /// <summary>The mode on the graph: the meter's, or (before any reading, after a relaunch) the log's last.</summary>
     private (MeterMode Mode, string Unit)? GraphMode =>
         _session.Latest is { } r ? (r.Mode, r.BaseUnit)
@@ -280,6 +287,7 @@ public sealed partial class MeterViewModel : ObservableObject
     private void OnReading(MeterReading reading)
     {
         ModeName = reading.ModeName;
+        HasRemoteKeys = _session.Capabilities.RemoteKeys;
         // The meter temperature is where the small display rests in most modes, not a page
         // someone went to, so it gets no chip.
         SetupPage = reading.Sub.Label is { } page and not ReadingDecoder.MeterTemperaturePage ? page : "";
@@ -311,6 +319,7 @@ public sealed partial class MeterViewModel : ObservableObject
             _ => ("Not connected", "Connect"),
         };
         IsConnected = _session.State == ConnectionState.Connected;
+        HasRemoteKeys = _session.Capabilities.RemoteKeys;
         RefreshConnectedLine();
         RefreshConnectedDetail();
         if (_session.State == ConnectionState.Disconnected && _session.Latest is null)
@@ -318,6 +327,7 @@ public sealed partial class MeterViewModel : ObservableObject
             ModeName = "No meter connected";
             SetupPage = "";
         }
+        DisplayChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void RefreshLogThrottled()

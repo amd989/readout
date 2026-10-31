@@ -53,6 +53,12 @@ public sealed class MeterSession
     public ConnectionState State => Active.State;
     public DiscoveredMeter? Meter => Active.Meter;
 
+    /// <summary>The kind of meter: the connected one's, else the last reading's (a 121GW before any).</summary>
+    public MeterModel Model => Active.Meter?.Model ?? Latest?.Model ?? MeterModel.Eevblog121Gw;
+
+    /// <summary>What <see cref="Model"/> can do beyond sending readings.</summary>
+    public MeterCapabilities Capabilities => MeterCapabilities.For(Model);
+
     public MeasurementLog Log { get; } = new();
 
     /// <summary>When false, readings still update the display but aren't logged.</summary>
@@ -168,7 +174,7 @@ public sealed class MeterSession
 
     public Task SendKeyAsync(MeterKey key, bool longPress = false, CancellationToken ct = default)
     {
-        if (Active.State != ConnectionState.Connected)
+        if (Active.State != ConnectionState.Connected || !Capabilities.RemoteKeys)
             return Task.CompletedTask;
         lock (_sentKeys)
             _sentKeys[key] = _time.GetUtcNow();

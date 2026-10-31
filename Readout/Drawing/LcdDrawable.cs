@@ -3,17 +3,23 @@ using Readout.Core.Display;
 namespace Readout.Drawing;
 
 /// <summary>
-/// A drawing of the 121GW's LCD: main and sub digits, units, the bar graph and the symbols
-/// around them. Colors follow the official app's palette.
+/// A drawing of the meter's LCD. For the 121GW: main and sub digits, units, the bar graph and
+/// the symbols around them, in the official app's palette. For an FS9721 meter: its simpler
+/// glass (LcdDrawable.Fs9721.cs).
 /// </summary>
-public sealed class LcdDrawable : IDrawable
+public sealed partial class LcdDrawable : IDrawable
 {
     // Virtual canvas; scaled to fit the view, keeping its proportions.
     private const float Width = 420;
     private const float Height = 220;
 
+    /// <summary>The kind of meter, which picks the layout.</summary>
+    public MeterModel Model { get; set; }
+
     /// <summary>Width over height, for sizing the view so the drawing fills it.</summary>
-    public const float AspectRatio = Width / Height;
+    public float AspectRatio => Width / CanvasHeight;
+
+    private float CanvasHeight => Model == MeterModel.Fs9721 ? Fs9721Height : Height;
 
     private static readonly Color Glass = Color.FromArgb("#C5CCB9");
     private static readonly Color Ink = Color.FromArgb("#111111");
@@ -27,21 +33,29 @@ public sealed class LcdDrawable : IDrawable
 
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {
-        var scale = Math.Min(dirtyRect.Width / Width, dirtyRect.Height / Height);
+        var height = CanvasHeight;
+        var scale = Math.Min(dirtyRect.Width / Width, dirtyRect.Height / height);
         var offsetX = dirtyRect.X + (dirtyRect.Width - Width * scale) / 2;
-        var offsetY = dirtyRect.Y + (dirtyRect.Height - Height * scale) / 2;
+        var offsetY = dirtyRect.Y + (dirtyRect.Height - height * scale) / 2;
 
         canvas.SaveState();
         canvas.Translate(offsetX, offsetY);
         canvas.Scale(scale, scale);
 
         canvas.FillColor = Bezel;
-        canvas.FillRoundedRectangle(0, 0, Width, Height, 14);
+        canvas.FillRoundedRectangle(0, 0, Width, height, 14);
         canvas.FillColor = Glass;
-        canvas.FillRoundedRectangle(8, 8, Width - 16, Height - 16, 9);
+        canvas.FillRoundedRectangle(8, 8, Width - 16, height - 16, 9);
 
         var r = Reading;
         var icons = r?.Icons ?? new Annunciators();
+
+        if (Model == MeterModel.Fs9721)
+        {
+            DrawFs9721(canvas, r, icons);
+            canvas.RestoreState();
+            return;
+        }
 
         DrawTopRow(canvas, icons);
         DrawSub(canvas, r);
@@ -129,17 +143,21 @@ public sealed class LcdDrawable : IDrawable
         Label(canvas, "1ms", 322, y - 1, 11, i.OneMsPeak, HorizontalAlignment.Left, 30);
     }
 
-    private static void DrawLeftColumn(ICanvas canvas, Annunciators i)
+    /// <summary>The low-battery symbol: a filled cell with + and -.</summary>
+    private static void Battery(ICanvas canvas, float x, float y, bool lit)
     {
-        // Battery: a filled cell with + and -.
-        var lit = i.LowBattery ? Ink : Ghost;
-        canvas.FillColor = lit;
-        canvas.FillRoundedRectangle(18, 78, 24, 12, 2);
-        canvas.FillRectangle(42, 81, 3, 6);
-        canvas.FontColor = i.LowBattery ? Glass : Ghost;
+        canvas.FillColor = lit ? Ink : Ghost;
+        canvas.FillRoundedRectangle(x, y, 24, 12, 2);
+        canvas.FillRectangle(x + 24, y + 3, 3, 6);
+        canvas.FontColor = lit ? Glass : Ghost;
         canvas.FontSize = 10;
         canvas.Font = Microsoft.Maui.Graphics.Font.DefaultBold;
-        canvas.DrawString("+ -", 18, 78, 24, 12, HorizontalAlignment.Center, VerticalAlignment.Center);
+        canvas.DrawString("+ -", x, y, 24, 12, HorizontalAlignment.Center, VerticalAlignment.Center);
+    }
+
+    private static void DrawLeftColumn(ICanvas canvas, Annunciators i)
+    {
+        Battery(canvas, 18, 78, i.LowBattery);
 
         Label(canvas, "Apo", 16, 94, 11, i.AutoPowerOff, HorizontalAlignment.Left, 34);
         Label(canvas, "REL", 16, 110, 10, i.Relative, HorizontalAlignment.Left, 34);
