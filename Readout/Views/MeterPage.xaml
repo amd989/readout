@@ -41,17 +41,30 @@
                      status line, like the print on a meter's bezel. -->
                 <Border BackgroundColor="#292F33" StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="0">
                     <VerticalStackLayout Spacing="0">
-                        <Grid IsVisible="{Binding IsConnected}" ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8" Padding="14,4,4,0">
+                        <!-- The mode in large type, then a chip: the button just sent (for a moment), or
+                             the SETUP page the small display shows, in the SETUP button's yellow. -->
+                        <Grid IsVisible="{Binding IsConnected}" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="8" Padding="14,4,4,0">
                             <Ellipse Fill="#4CAF50" WidthRequest="7" HeightRequest="7" VerticalOptions="Center" />
-                            <Label Grid.Column="1" Text="{Binding ConnectedLine}" FontSize="12" TextColor="#E3E7DE"
+                            <Label Grid.Column="1" Text="{Binding ConnectedLine}" FontSize="15" FontFamily="OpenSansSemibold" TextColor="#E3E7DE"
                                    LineBreakMode="TailTruncation" VerticalOptions="Center" />
-                            <Label Grid.Column="2" Text="{Binding ConnectedDetail}" FontSize="11" TextColor="#9AA0A3" VerticalOptions="Center"
+                            <Grid Grid.Column="2" VerticalOptions="Center">
+                                <Border IsVisible="{Binding ShowLastKey}" BackgroundColor="#E8913F" StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 6" Padding="6,1">
+                                    <Label Text="{Binding LastKey}" FontSize="11" FontFamily="OpenSansSemibold" TextColor="#1E2326" />
+                                </Border>
+                                <Border IsVisible="{Binding ShowSetupPage}" BackgroundColor="#F0B323" StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 6" Padding="6,1"
+                                        ToolTipProperties.Text="The small display shows this SETUP page. Press SETUP to step through them.">
+                                    <Label Text="{Binding SetupPage, StringFormat='SETUP: {0}'}" FontSize="11" FontFamily="OpenSansSemibold" TextColor="#1E2326" />
+                                </Border>
+                            </Grid>
+                            <Label Grid.Column="3" Text="{Binding ConnectedDetail}" FontSize="11" TextColor="#9AA0A3" VerticalOptions="Center"
                                    IsVisible="{Binding ConnectedDetail, Converter={StaticResource NotEmpty}}" />
-                            <drawing:SignalBarsView Grid.Column="3" WidthRequest="15" HeightRequest="11" VerticalOptions="Center"
+                            <drawing:SignalBarsView Grid.Column="4" WidthRequest="15" HeightRequest="11" VerticalOptions="Center"
                                                     Bars="{Binding SignalBars}" IsVisible="{Binding HasSignal}" Color="#E3E7DE"
                                                     SemanticProperties.Description="{Binding SignalDescription}"
                                                     ToolTipProperties.Text="{Binding SignalDescription}" />
-                            <Button Grid.Column="4" Text="Disconnect" Command="{Binding PrimaryActionCommand}" Style="{StaticResource LinkButton}"
+                            <Button Grid.Column="5" Text="Disconnect" Command="{Binding PrimaryActionCommand}" Style="{StaticResource LinkButton}"
                                     FontSize="12" TextColor="#E8913F" Padding="8,0" HeightRequest="28" MinimumHeightRequest="28" />
                         </Grid>
                         <GraphicsView

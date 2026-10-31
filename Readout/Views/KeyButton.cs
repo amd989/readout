@@ -50,7 +50,20 @@ public sealed class KeyButton : Button
     {
         _timer?.Stop();
         if (!_longSent)
+        {
             KeyPressed?.Invoke(this, new KeyPressedEventArgs(Key, longPress: false));
+            Flash();
+        }
+    }
+
+    /// <summary>
+    /// A quick dip in size when a press is sent: a tap is often over before the Pressed color
+    /// shows, so this is what tells you the button took.
+    /// </summary>
+    private async void Flash()
+    {
+        await this.ScaleToAsync(0.92, 60, Easing.CubicOut);
+        await this.ScaleToAsync(1, 160, Easing.CubicOut);
     }
 
     private IDispatcherTimer CreateTimer()
@@ -63,6 +76,7 @@ public sealed class KeyButton : Button
             _longSent = true;
             Haptic(HapticFeedbackType.LongPress);
             KeyPressed?.Invoke(this, new KeyPressedEventArgs(Key, longPress: true));
+            Flash();
         };
         return timer;
     }

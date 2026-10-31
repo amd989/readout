@@ -132,6 +132,23 @@ public sealed partial class MeterViewModel : ObservableObject
     [ObservableProperty]
     private string _modeName = "No meter connected";
 
+    /// <summary>The SETUP page the small display shows ("Battery"), or empty for a live reading.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowSetupPage))]
+    private string _setupPage = "";
+
+    /// <summary>The button just sent to the meter ("MODE", "Hold RANGE"), for a moment after it's sent.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowLastKey), nameof(ShowSetupPage))]
+    private string _lastKey = "";
+
+    public bool ShowLastKey => LastKey.Length > 0;
+
+    /// <summary>The SETUP chip, which gives way to the last-key chip while that shows.</summary>
+    public bool ShowSetupPage => SetupPage.Length > 0 && LastKey.Length == 0;
+
+    private int _lastKeyShown;
+
     [ObservableProperty]
     private string _readingDescription = "";
 
@@ -175,6 +192,7 @@ public sealed partial class MeterViewModel : ObservableObject
 
     public async Task PressKeyAsync(MeterKey key, bool longPress)
     {
+        _ = ShowLastKeyAsync(longPress ? $"Hold {KeyName(key)}" : KeyName(key));
         try
         {
             await _session.SendKeyAsync(key, longPress);
@@ -183,6 +201,23 @@ public sealed partial class MeterViewModel : ObservableObject
         {
             _logger.LogWarning(ex, "key {Key} failed", key);
         }
+    }
+
+    /// <summary>The button's name as printed on the meter.</summary>
+    internal static string KeyName(MeterKey key) => key switch
+    {
+        MeterKey.Peak => "1ms PEAK",
+        MeterKey.MinMax => "MIN/MAX",
+        _ => key.ToString().ToUpperInvariant(),
+    };
+
+    private async Task ShowLastKeyAsync(string text)
+    {
+        var shown = ++_lastKeyShown;
+        LastKey = text;
+        await Task.Delay(TimeSpan.FromSeconds(1.5));
+        if (shown == _lastKeyShown)
+            LastKey = "";
     }
 
     [RelayCommand]
@@ -237,7 +272,10 @@ public sealed partial class MeterViewModel : ObservableObject
 
     private void OnReading(MeterReading reading)
     {
-        ModeName = reading.Sub.Label is { } label ? $"{reading.ModeName} · SETUP: {label}" : reading.ModeName;
+        ModeName = reading.ModeName;
+        // The meter temperature is where the small display rests in most modes, not a page
+        // someone went to, so it gets no chip.
+        SetupPage = reading.Sub.Label is { } page and not ReadingDecoder.MeterTemperaturePage ? page : "";
         ReadingDescription = reading.Sub.Text.Length > 0
             ? $"{reading.MainLine}, {reading.Sub.Line}"
             : reading.MainLine;
@@ -248,8 +286,10 @@ public sealed partial class MeterViewModel : ObservableObject
 
     private void RefreshConnectedLine()
     {
+        // Once readings arrive, the line names the mode: that's what changes as you use the
+        // meter. The meter's name is in the connect card and screen reader text.
         var name = _session.IsDemo ? "Demo meter" : _session.Meter?.Name ?? "";
-        ConnectedLine = _session.Latest is null ? name : $"{name} · {ModeName}";
+        ConnectedLine = _session.Latest is null ? name : _session.IsDemo ? $"{ModeName} (demo)" : ModeName;
     }
 
     private void RefreshConnection()
@@ -267,7 +307,10 @@ public sealed partial class MeterViewModel : ObservableObject
         RefreshConnectedLine();
         RefreshConnectedDetail();
         if (_session.State == ConnectionState.Disconnected && _session.Latest is null)
+        {
             ModeName = "No meter connected";
+            SetupPage = "";
+        }
     }
 
     private void RefreshLogThrottled()
