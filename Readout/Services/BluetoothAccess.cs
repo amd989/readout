@@ -15,9 +15,10 @@ public sealed class BluetoothAccess(Func<IBluetoothLE>? ble)
         if (status != PermissionStatus.Granted)
             return "Readout needs the Nearby devices permission to find your meter. You can allow it in Settings.";
 #endif
-        // Right after launch the radio reports Unknown until the OS answers. Auto-connect
-        // runs then, so give it a moment rather than give up.
-        for (var waited = 0; waited < 3000 && ble().State is BluetoothState.Unknown or BluetoothState.TurningOn; waited += 100)
+        // The radio reports Unknown until the OS answers: for a moment after launch, and for as
+        // long as the Bluetooth permission prompt is up (a new Mac build asks again). Wait that
+        // out rather than give up, which would leave auto-connect not trying at all.
+        for (var waited = 0; waited < 30_000 && ble().State is BluetoothState.Unknown or BluetoothState.TurningOn; waited += 100)
             await Task.Delay(100);
 
         return ble().State switch
