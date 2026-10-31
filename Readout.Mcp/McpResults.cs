@@ -16,7 +16,7 @@ public sealed record StatusResult(
 /// <param name="Symbols">The LCD symbols that are lit ("AUTO", "HOLD", "REL", "MAX"…).</param>
 public sealed record ReadingResult(
     DateTimeOffset Time, double AgeSeconds, string Mode, string Display, double? Value, string Unit,
-    bool Overload, string? SubDisplay, string? SetupPage, IReadOnlyList<string> Symbols);
+    bool Overload, string? SubDisplay, string? SetupPage, IReadOnlyList<string> Symbols, string Packet);
 
 public sealed record StatsResult(int Count, double Min, double Max, double Average, double PeakToPeak, string Unit);
 

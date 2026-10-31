@@ -44,7 +44,7 @@ public sealed class MeterTools(
         {
             Name = "get_reading",
             Title = "Read the meter",
-            Description = "The meter's current reading: the main display (value and unit), the small display, the mode and the lit LCD symbols (AUTO, HOLD, REL, MIN/MAX…). Fails when no meter is connected.",
+            Description = "The meter's current reading: the main display (value and unit), the small display, the mode, the lit LCD symbols (AUTO, HOLD, REL, MIN/MAX…) and the raw packet in hex (see the protocol notes). On a SETUP page, setup_page names it and sub_display has its value. Fails when no meter is connected.",
             ReadOnly = true,
         }),
         McpServerTool.Create(GetRecentReadingsAsync, new McpServerToolCreateOptions
@@ -263,9 +263,10 @@ public sealed class MeterTools(
         r.BaseValue,
         r.BaseUnit,
         r.MainOverload,
-        r.Sub.Label is null && r.Sub.Text.Length > 0 ? r.Sub.Line : null,
+        r.Sub.Text.Length > 0 ? r.Sub.Line : null,
         r.Sub.Label,
-        Symbols(r.Icons));
+        Symbols(r.Icons),
+        Convert.ToHexString(r.Packet.Bytes));
 
     private static List<string> Symbols(Annunciators i)
     {
