@@ -148,8 +148,11 @@ if ($Wack) {
     $FullName = (Get-AppxPackage -Name $Identity.Name).PackageFullName
     $Report = Join-Path $Out "wack-$HostArch.xml"
     Write-Host "==> Certification kit on $FullName (takes a few minutes)..."
+    # The kit won't overwrite a report, and reading the old one would give the last run's result.
+    Remove-Item $Report -ErrorAction SilentlyContinue
     & $Appcert reset | Out-Null
     & $Appcert test -packagefullname $FullName -reportoutputpath $Report
+    if (-not (Test-Path $Report)) { Write-Error "The certification kit didn't write a report (exit code $LASTEXITCODE)." }
     [xml]$Result = Get-Content $Report
     $Overall = $Result.REPORT.OVERALL_RESULT
     Write-Host "    $Overall ($Report)"

@@ -27,6 +27,7 @@ dotnet build Readout -f net10.0-maccatalyst
 dotnet build Readout -f net10.0-android
 ./deploy-ios.sh        # physical iPhone; device names come from .devices (git-ignored)
 ./deploy-mac.sh        # build and launch the Mac app (--log follows its output)
+./deploy-windows.ps1   # build and launch the Windows app (Debug, unpackaged), replacing a running copy
 ./publish-ios.sh       # Release .ipa for TestFlight / App Store (fails on any non-arm64 slice)
 ./publish-mac.sh       # Release .pkg for the Mac App Store (universal, sandboxed)
 ./publish-windows.ps1  # Release .msix (x64 + arm64) for the Microsoft Store; -Test -Install for a local copy
