@@ -102,9 +102,17 @@ static void sleepUntilTheMeterTalks() {
   Serial.flush();
   setLed(false);
   meter.end();
+  // A weak pull toward the level it rests at, so a line nothing drives (a loose wire, a meter
+  // that lets go of TXD) doesn't wake it on noise. The optocoupler's 10 kΩ pull-up wins anyway.
+  gpio_num_t pin = (gpio_num_t)METER_RX_PIN;
 #if CONFIG_IDF_TARGET_ESP32
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)METER_RX_PIN, level ? 0 : 1);
+  rtc_gpio_init(pin);
+  rtc_gpio_set_direction(pin, RTC_GPIO_MODE_INPUT_ONLY);
+  if (level) { rtc_gpio_pulldown_dis(pin); rtc_gpio_pullup_en(pin); }
+  else { rtc_gpio_pullup_dis(pin); rtc_gpio_pulldown_en(pin); }
+  esp_sleep_enable_ext0_wakeup(pin, level ? 0 : 1);
 #else
+  gpio_set_pull_mode(pin, level ? GPIO_PULLUP_ONLY : GPIO_PULLDOWN_ONLY);
   esp_deep_sleep_enable_gpio_wakeup(1ULL << METER_RX_PIN,
                                     level ? ESP_GPIO_WAKEUP_GPIO_LOW : ESP_GPIO_WAKEUP_GPIO_HIGH);
 #endif
