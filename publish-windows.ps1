@@ -25,7 +25,9 @@ Also install this PC's build for a test run (registers the build folder; needs D
 
 .PARAMETER Wack
 Also install this PC's build and run the Windows App Certification Kit on it (needs an
-administrator shell; the report goes to artifacts/windows).
+administrator shell; the report goes to artifacts/windows). The kit needs a properly installed
+package, so this signs a copy (artifacts/windows/test-signed) with a test certificate for the
+package's publisher, trusts that certificate on this PC, and installs the copy.
 
 .EXAMPLE
 ./publish-windows.ps1 -Test -Install
@@ -108,34 +110,9 @@ foreach ($Rid in $Rids) {
     Write-Host "    $Target"
 }
 
-# The certification kit tests an installed app (an unsigned .msix can't be installed on its own).
-if ($Wack) { $Install = $true }
-
-if ($Install) {
-    $HostArch = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') { 'arm64' } else { 'x64' }
-    $Runtime = Get-ChildItem (Join-Path $Bin "win-$HostArch/AppPackages") -Recurse -Filter 'Microsoft.WindowsAppRuntime.*.msix' |
-        Where-Object { $_.Directory.Name -eq $HostArch } | Select-Object -First 1
-    Write-Host "==> Installing the $HostArch build for testing..."
-    # The app needs the Windows App Runtime. -Register can't take it as a dependency file, so
-    # install it on its own first if this PC doesn't have it (the Store does this for users).
-    if ($Runtime -and -not (Get-AppxPackage -Name $Runtime.BaseName | Where-Object { "$($_.Architecture)" -eq $HostArch })) {
-        Add-AppxPackage -Path $Runtime.FullName
-    }
-
-    # Register the unpacked .msix, not the build folder: packaging pulls in files (the tab icons,
-    # for one) that the build folder doesn't have.
-    $Layout = [System.IO.Path]::GetFullPath((Join-Path $Out "layout-$HostArch"))
-    # Windows won't register the same version again once its files changed, so remove the old
-    # test copy first (this also clears its data).
-    $Installed = Get-AppxPackage -Name $Identity.Name
-    if ($Installed) { Remove-AppxPackage $Installed.PackageFullName }
-    Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($Layout, 'OrdinalIgnoreCase') } | Stop-Process -Force
-    Remove-Item -Recurse -Force $Layout -ErrorAction SilentlyContinue
-    $Package = Join-Path $Out "Readout_$($Version)_$HostArch.msix"
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($Package, $Layout)
-    Add-AppxPackage -Register (Join-Path $Layout 'AppxManifest.xml') -ForceApplicationShutdown
-    Write-Host "    Readout is in the Start menu. Remove it with: Get-AppxPackage $($Identity.Name) | Remove-AppxPackage"
-}
+$HostArch = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') { 'arm64' } else { 'x64' }
+$Package = Join-Path $Out "Readout_$($Version)_$HostArch.msix"
+$Layout = [System.IO.Path]::GetFullPath((Join-Path $Out "layout-$HostArch"))
 
 if ($Wack) {
     $Appcert = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/App Certification Kit/appcert.exe'
@@ -145,6 +122,70 @@ if ($Wack) {
         Write-Error "No Windows App Certification Kit; it comes with the Windows SDK."
     }
     if (-not $IsAdmin) { Write-Error "The certification kit needs an administrator shell." }
+}
+
+if ($Install -or $Wack) {
+    $Runtime = Get-ChildItem (Join-Path $Bin "win-$HostArch/AppPackages") -Recurse -Filter 'Microsoft.WindowsAppRuntime.*.msix' |
+        Where-Object { $_.Directory.Name -eq $HostArch } | Select-Object -First 1
+    Write-Host "==> Installing the $HostArch build for testing..."
+    # The app needs the Windows App Runtime. Neither -Register nor an unsigned dependency file
+    # brings it in, so install it on its own first if this PC doesn't have it (the Store does
+    # this for users).
+    if ($Runtime -and -not (Get-AppxPackage -Name $Runtime.BaseName | Where-Object { "$($_.Architecture)" -eq $HostArch })) {
+        Add-AppxPackage -Path $Runtime.FullName
+    }
+
+    # Windows won't register the same version again once its files changed, so remove the old
+    # test copy first (this also clears its data).
+    $Installed = Get-AppxPackage -Name $Identity.Name
+    if ($Installed) { Remove-AppxPackage $Installed.PackageFullName }
+    Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($Layout, 'OrdinalIgnoreCase') } | Stop-Process -Force
+    Remove-Item -Recurse -Force $Layout -ErrorAction SilentlyContinue
+}
+
+if ($Wack) {
+    # The kit can't find a package registered from a folder ("Failed to find the package root
+    # path"), so install the real .msix. Windows only installs a signed one: sign a copy with a
+    # test certificate for the package's publisher and trust it on this PC. The .msix files to
+    # upload stay unsigned.
+    $Cert = Get-ChildItem Cert:\CurrentUser\My |
+        Where-Object { $_.Subject -eq $Identity.Publisher -and $_.FriendlyName -eq 'Readout test signing' -and $_.NotAfter -gt (Get-Date).AddDays(1) } |
+        Select-Object -First 1
+    if (-not $Cert) {
+        Write-Host '    Making a test signing certificate...'
+        $Cert = New-SelfSignedCertificate -Type Custom -Subject $Identity.Publisher -KeyUsage DigitalSignature `
+            -FriendlyName 'Readout test signing' -CertStoreLocation Cert:\CurrentUser\My `
+            -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}')
+    }
+    if (-not (Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Thumbprint -eq $Cert.Thumbprint)) {
+        $Cer = Join-Path ([IO.Path]::GetTempPath()) 'readout-test-signing.cer'
+        Export-Certificate -Cert $Cert -FilePath $Cer | Out-Null
+        Import-Certificate -FilePath $Cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+        Remove-Item $Cer
+    }
+
+    $SignTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+        Sort-Object { [version]$_.Directory.Parent.Name } -Descending | Select-Object -First 1
+    if (-not $SignTool) { Write-Error 'No signtool.exe; it comes with the Windows SDK.' }
+    $Signed = Join-Path $Out "test-signed/Readout_$($Version)_$HostArch.msix"
+    New-Item -ItemType Directory -Force (Split-Path $Signed) | Out-Null
+    Copy-Item $Package $Signed -Force
+    & $SignTool.FullName sign /q /fd SHA256 /sha1 $Cert.Thumbprint $Signed
+    if ($LASTEXITCODE -ne 0) { Write-Error 'signtool failed.' }
+    Add-AppxPackage -Path $Signed -ForceApplicationShutdown
+}
+elseif ($Install) {
+    # Register the unpacked .msix, not the build folder: packaging pulls in files (the tab icons,
+    # for one) that the build folder doesn't have. No signing needed, but needs Developer Mode.
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($Package, $Layout)
+    Add-AppxPackage -Register (Join-Path $Layout 'AppxManifest.xml') -ForceApplicationShutdown
+}
+
+if ($Install -or $Wack) {
+    Write-Host "    Readout is in the Start menu. Remove it with: Get-AppxPackage $($Identity.Name) | Remove-AppxPackage"
+}
+
+if ($Wack) {
     $FullName = (Get-AppxPackage -Name $Identity.Name).PackageFullName
     $Report = Join-Path $Out "wack-$HostArch.xml"
     Write-Host "==> Certification kit on $FullName (takes a few minutes)..."
