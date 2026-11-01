@@ -70,6 +70,9 @@ foreach ($Rid in $Rids) {
     Write-Host "==> Building $Version for $Arch..."
     # Stale packages from an earlier build would otherwise be picked up below.
     Remove-Item -Recurse -Force (Join-Path $Bin "$Rid/AppPackages") -ErrorAction SilentlyContinue
+    # MAUI only regenerates its copy of the manifest when Package.appxmanifest changes, not when
+    # the version does, so a build on a later day would keep the old version.
+    Remove-Item -Recurse -Force (Join-Path $Proj "obj/Release/$Tfm/$Rid/resizetizer/m") -ErrorAction SilentlyContinue
 
     dotnet publish $Proj -f $Tfm -c Release `
         "-p:WindowsRuntimeIdentifier=$Rid" `
