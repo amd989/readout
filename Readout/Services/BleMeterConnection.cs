@@ -153,8 +153,30 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
         }
     }
 
-    /// <summary>The data characteristic by UUID, else the first one that can notify outside the standard services.</summary>
+    /// <summary>
+    /// The data characteristic by UUID, else the first one that can notify outside the standard services.
+    /// Windows can answer with no services right after connecting, before it has read them from the
+    /// meter, so ask a few times.
+    /// </summary>
     private async Task<ICharacteristic?> FindDataCharacteristicAsync(IDevice device, CancellationToken ct)
+    {
+        const int attempts = 5;
+        for (var attempt = 1; ; attempt++)
+        {
+            var (data, fallback) = await SearchServicesAsync(device, ct);
+            if (data is not null) return data;
+            if (attempt == attempts)
+            {
+                if (fallback is not null)
+                    _logger.LogWarning("data characteristic not found by UUID, using {Characteristic}", fallback.Id);
+                return fallback;
+            }
+            _logger.LogInformation("data characteristic not found yet (try {Attempt}), asking again", attempt);
+            await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
+        }
+    }
+
+    private static async Task<(ICharacteristic? Data, ICharacteristic? Fallback)> SearchServicesAsync(IDevice device, CancellationToken ct)
     {
         ICharacteristic? fallback = null;
         foreach (var service in await device.GetServicesAsync(ct))
@@ -163,14 +185,12 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
             foreach (var characteristic in characteristics)
             {
                 if (characteristic.Id == MeterBluetooth.DataCharacteristicUuid)
-                    return characteristic;
+                    return (characteristic, null);
                 if (fallback is null && characteristic.CanUpdate && !MeterBluetooth.StandardServices.Contains(service.Id))
                     fallback = characteristic;
             }
         }
-        if (fallback is not null)
-            _logger.LogWarning("data characteristic not found by UUID, using {Characteristic}", fallback.Id);
-        return fallback;
+        return (null, fallback);
     }
 
     public async Task DisconnectAsync()
