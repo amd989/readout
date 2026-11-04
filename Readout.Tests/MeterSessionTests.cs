@@ -127,6 +127,48 @@ public sealed class MeterSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task ZeroWhileAutoranging_IsTheBlankDisplay()
+    {
+        await _session.ConnectAsync(Meter);
+
+        // Recorded from a real meter: a 119 Ω resistor taken off the leads, then the range
+        // steps up to OFL. Between steps the LCD is blank; the packets say 0 with a stray bar.
+        PacketBuilder Ohms(int range, int raw, int bar, bool overload = false) => new()
+        {
+            Mode = MeterMode.Resistance, AutoRange = true, MainRangeIndex = range, MainRawValue = raw,
+            MainOverload = overload, BarValue = bar,
+        };
+        _bluetooth.Send(Ohms(1, 11901, 5).BuildPacket());
+        foreach (var (range, bar) in new[] { (2, 23), (4, 22), (5, 8) })
+        {
+            _bluetooth.Send(Ohms(range, 0, bar).BuildPacket());
+            Assert.True(_session.Latest!.Blank);
+            Assert.Equal(0, _session.Latest.Bar.Segments);
+        }
+        _bluetooth.Send(Ohms(5, 17916, 8).BuildPacket());
+        Assert.False(_session.Latest!.Blank);
+        Assert.Equal("1.7916", _session.Latest.MainText);
+
+        _bluetooth.Send(Ohms(6, 0, 2).BuildPacket());
+        Assert.True(_session.Latest!.Blank);
+        _bluetooth.Send(Ohms(6, 0, 2, overload: true).BuildPacket());
+        Assert.Equal("OFL", _session.Latest!.MainText);
+
+        // Only the readings the meter showed are logged: no dips to 0 Ω in the graph.
+        Assert.Equal(3, _session.Log.Count);
+    }
+
+    [Fact]
+    public async Task ZeroAfterAManualRangeChange_IsAReading()
+    {
+        await _session.ConnectAsync(Meter);
+        _bluetooth.Send(new PacketBuilder { MainRangeIndex = 1 }.BuildPacket());
+        _bluetooth.Send(new PacketBuilder { MainRangeIndex = 2 }.BuildPacket());
+        Assert.False(_session.Latest!.Blank);
+        Assert.Equal(0, _session.Latest.Value);
+    }
+
+    [Fact]
     public async Task ZeroLongAfterAModeChange_IsAReading()
     {
         await _session.ConnectAsync(Meter);

@@ -191,14 +191,20 @@ public sealed class MeterSession
         var pressed = Latest is { } previous ? KeyInference.Infer(previous.Packet, packet) : null;
 
         // After a mode change the meter's display stays blank until it has measured, but its
-        // packets say 0 (a real meter, on temperature, for about two seconds).
+        // packets say 0 (a real meter, on temperature, for about two seconds). The same after
+        // each range step while autoranging (on Ω, stepping up to OFL), with a bar that jumps.
         if (Latest is { } last && (last.Packet.Mode != packet.Mode ||
-            (last.Packet.Coupling == Coupling.AcPlusDc) != (packet.Coupling == Coupling.AcPlusDc)))
+            (last.Packet.Coupling == Coupling.AcPlusDc) != (packet.Coupling == Coupling.AcPlusDc) ||
+            (packet.AutoRange && last.Packet.MainRangeIndex != packet.MainRangeIndex)))
             _modeChangedAt = now;
         if (_modeChangedAt is { } changed)
         {
             if (!packet.MainOverload && packet.MainRawValue == 0 && now - changed < BlankAfterModeChange)
-                reading = reading with { Blank = true, MainText = "", MainNegative = false, MainUnit = "", Value = null, BaseValue = null };
+                reading = reading with
+                {
+                    Blank = true, MainText = "", MainNegative = false, MainUnit = "", Value = null, BaseValue = null,
+                    Bar = reading.Bar with { Segments = 0 },
+                };
             else
                 _modeChangedAt = null;
         }
