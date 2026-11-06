@@ -15,7 +15,9 @@ reconnects by itself.
 
 - An ESP32 board: a classic ESP32 board such as an ESP-WROOM-32 DevKit (`esp32dev`), or an
   ESP32-C3 board such as the C3 SuperMini (`esp32c3`).
-- A PC817 (or similar) optocoupler, a 680 Ω and a 10 kΩ resistor.
+- An optocoupler: a PC817 (or similar), or the slotted optical switch from an old ball mouse
+  (pins A, K, C, E). A 330 Ω resistor for its LED and a 10–47 kΩ pull-up (10 kΩ for a PC817,
+  more for a mouse switch, which passes less light).
 - A small switch for ENTX, so serial can be turned off: while it's on, the meter's own auto
   power-off is off.
 - Power of its own (below). Not the meter's 9 V battery: keeping that isolated would take a DC-DC
@@ -23,35 +25,55 @@ reconnects by itself.
 
 ## Wiring
 
+There are two ways to light the optocoupler's LED. Pick one, and flash the matching build.
+
+### TXD lights the LED (3 wires out of the meter) — `esp32dev`, `esp32c3`
+
 ```
  Meter (FS9721 side)                          ESP32 side
 
  ENTX ──── switch ──── VSS (button common)
 
- VDD ──── 680 Ω ──── PC817 pin 1 (anode)      PC817 pin 4 (collector) ──┬── GPIO 33 (esp32dev)
- TXD ──────────────── PC817 pin 2 (cathode)                             │   GPIO 3  (esp32c3)
-                                                                        └── 10 kΩ ── 3.3 V
-                                              PC817 pin 3 (emitter) ────── GND
+ TXD ──── 330 Ω ──── LED anode (A, pin 1)     collector (C, pin 4) ──┬── GPIO 33 (esp32dev)
+ VSS ──────────────── LED cathode (K, pin 2)                         │   GPIO 3  (esp32c3)
+                                                                     └── 10–47 kΩ ── 3.3 V
+                                              emitter (E, pin 3) ────── GND
 ```
 
-- **VDD** and **VSS** are the chip's supply, about 3 V apart. The push buttons' common side is
-  VSS, which is also where ENTX goes; it's a much bigger pad to solder to than the ones around
-  the chip. VDD is the chip pad next to AGND and VSS (docs/FS9721.md), or measure for 3 V.
-- The optocoupler's LED lights only while TXD is low, during the 0 bits of each byte, so it
-  draws next to nothing from the meter between frames, and the signal reaches the ESP32 the
-  right way up.
+Only TXD, VSS and ENTX leave the meter (two, with the ENTX switch inside the case). The LED is
+lit whenever the meter is on and idle, which costs the meter's battery about 1–2 mA, about as
+much as the meter itself: it lasts roughly half as long. The signal arrives inverted, which these
+builds expect.
+
+### VDD lights the LED (4 wires, least drain) — `esp32dev-vdd`, `esp32c3-vdd`
+
+```
+ VDD ──── 330 Ω ──── LED anode (A)
+ TXD ──────────────── LED cathode (K)         (ESP32 side as above)
+```
+
+The LED lights only during the 0 bits of each byte, so it draws next to nothing between frames,
+and the signal arrives the right way up. VDD is the chip's positive supply, about 3 V above VSS:
+the chip pad next to AGND and VSS (docs/FS9721.md), or measure for it.
+
+### Either way
+
+- **VSS** is the chip's negative supply. The push buttons' common side is VSS, which is also
+  where ENTX goes; it's a much bigger pad to solder to than the ones around the chip.
 - The optocoupler keeps the ESP32 apart from the meter's circuit, which floats at whatever the
-  probes touch.
+  probes touch. Don't connect ESP32 GND to the meter.
 - The input has to be a pin that can wake the chip from deep sleep: one of the RTC pins on a
   classic ESP32 (such as 4, 25–27 or 32–39), GPIO 0–5 on an ESP32-C3.
+- A mouse's slotted switch: cover the slot so room light doesn't switch it, and check K to E
+  reads open once it's off the mouse's board (mice tie them together on the board).
 - Adding parts and wires inside the case shrinks the gaps its safety rating relies on. Treat a
   modified meter as a low-voltage bench meter.
 
 ### Bench test without the optocoupler
 
-For a first try, TXD can go straight to the input pin and VSS to GND, with the same build. The
-ESP32 is then connected to the meter's circuit: keep the test leads out of anything but low
-voltages, and never measure mains while the ESP32 is on USB.
+For a first try, TXD can go straight to the input pin and VSS to GND, with a `-vdd` build (the
+signal isn't inverted). The ESP32 is then connected to the meter's circuit: keep the test leads
+out of anything but low voltages, and never measure mains while the ESP32 is on USB.
 
 ## Power
 
@@ -79,7 +101,7 @@ With [PlatformIO](https://platformio.org) (the CLI, or the VS Code extension):
 
 ```bash
 cd firmware/fs9721-bridge
-pio run -e esp32dev -t upload     # or -e esp32c3
+pio run -e esp32dev -t upload     # or esp32dev-vdd, esp32c3, esp32c3-vdd: see Wiring
 pio device monitor                # 115200 baud
 ```
 
@@ -94,12 +116,16 @@ advertising as "Readout FS9721 A1B2"
 no data for 10 s: sleeping until GPIO 33 goes low
 ```
 
-Every line should run `1x 2x … ex`. Lines of other bytes mean the inversion setting is wrong
-for your wiring. When nothing arrives for 5 seconds, the bridge says what the input pin is doing:
+Every line should run `1x 2x … ex`. Lines of other bytes, the same every frame, mean the build
+doesn't match the wiring: flash the other one (with or without `-vdd`). When nothing arrives
+for 5 seconds, the bridge says what the input pin is doing, and how far its voltage swings:
 
-- *always high*: the meter isn't sending. Check ENTX; the RS232 symbol should be on.
-- *always low*: TXD or ground isn't connected (or is on the wrong pin), or the inversion is wrong.
-- *changing, but no bytes*: the inversion setting is wrong.
+- *always high*, flat near 3.3 V: no light reaches the optocoupler. Check ENTX (the RS232 symbol
+  should be on), that the LED's A and K are the right way round for your wiring, and its wires.
+- *always low*: the optocoupler is stuck on (room light in a mouse switch's slot, C and E
+  swapped), or the build doesn't match the wiring.
+- *changing, but no bytes*, or a swing that dips but stays above about 0.8 V: too little light.
+  Use a larger pull-up (47 kΩ) or a smaller LED resistor.
 
 The LED blinks with each frame (GPIO 2 on dev boards, GPIO 8 on the C3 SuperMini). After a
 wake-up the first line says "woken by the meter".
@@ -111,7 +137,7 @@ In `platformio.ini`:
 | Flag | What it is |
 |---|---|
 | `METER_RX_PIN` | The GPIO the signal reaches; must be able to wake the chip |
-| `METER_RX_INVERTED` | 1 for an optocoupler whose LED lights while TXD is high; 0 (the default) for the wiring above or direct wiring |
+| `METER_RX_INVERTED` | 1 when TXD lights the LED; 0 when VDD does, or TXD is wired straight to the pin. Set by the build you pick |
 | `SLEEP_AFTER_S` | Deep sleep after this many seconds without data (10); 0 never sleeps |
 | `METER_SYMBOLS` | The meter's four maker-chosen LCD symbols, bit 0 first (`°F,hFE,°C,` on the Miyako 890G) |
 | `LED_PIN`, `LED_ACTIVE_LOW` | The status LED, or -1 for none |

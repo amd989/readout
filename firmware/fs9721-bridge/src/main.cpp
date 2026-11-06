@@ -70,9 +70,9 @@ static uint32_t samplesLow = 0;
 
 static void reportQuiet() {
   uint32_t total = samplesHigh + samplesLow;
-  const char *level = samplesLow == 0 ? "always high: the meter isn't sending (is RS232 on its LCD?)"
-                      : samplesHigh == 0 ? "always low: check the TXD and ground wires, or the inversion setting"
-                                         : "changing, but no bytes: check the inversion setting";
+  const char *level = samplesLow == 0 ? "always high: nothing is arriving (is RS232 on the meter's LCD? is the LED wired right?)"
+                      : samplesHigh == 0 ? "always low: check the wires, or flash the build for your wiring (with or without -vdd)"
+                                         : "changing, but no bytes: flash the build for your wiring (with or without -vdd)";
   Serial.printf("no data for %lu s; GPIO %d is %s (%lu%% high)\n", (unsigned long)(QUIET_REPORT_MS / 1000),
                 METER_RX_PIN, level, (unsigned long)(total ? samplesHigh * 100 / total : 0));
 
