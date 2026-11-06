@@ -11,9 +11,15 @@ namespace Readout.Views;
 public sealed class TrendView : GraphicsView
 {
     /// <summary>How to use an interactive graph, shown under it.</summary>
-    public static string Hint { get; } = DeviceInfo.Platform == DevicePlatform.WinUI
-        ? "Scroll to zoom, drag to pan, double-click to show everything."
-        : "Pinch to zoom, drag to pan, double-tap to show everything.";
+    public static string Hint { get; } =
+#if LINUX
+        // A mouse can't pinch: the Linux head zooms with the wheel and resets on a double-click.
+        "Scroll or pinch to zoom, drag to pan, double-click to show everything.";
+#else
+        DeviceInfo.Platform == DevicePlatform.WinUI
+            ? "Scroll to zoom, drag to pan, double-click to show everything."
+            : "Pinch to zoom, drag to pan, double-tap to show everything.";
+#endif
 
     private readonly TrendDrawable _drawable = new();
     private readonly TrendWindow _window = new();
@@ -71,6 +77,24 @@ public sealed class TrendView : GraphicsView
         }
     }
 
+    /// <summary>
+    /// Zooms in (<paramref name="scale"/> above 1) or out, keeping the point at
+    /// <paramref name="anchor"/> (0 the left edge, 1 the right) where it is.
+    /// </summary>
+    public void ZoomAt(double scale, double anchor)
+    {
+        _window.Zoom(scale, anchor, TrendDrawable.DataSpan(Samples));
+        Invalidate();
+    }
+
+    /// <summary>Moves the shown stretch by a drag of <paramref name="dx"/> (positive: right, toward earlier readings).</summary>
+    public void PanBy(double dx)
+    {
+        if (Width <= 0) return;
+        _window.Pan(dx / Width, TrendDrawable.DataSpan(Samples));
+        Invalidate();
+    }
+
     /// <summary>Back to showing everything (a new recording, a different session).</summary>
     public void ResetZoom()
     {
@@ -80,9 +104,8 @@ public sealed class TrendView : GraphicsView
 
     private void OnPinch(object? sender, PinchGestureUpdatedEventArgs e)
     {
-        if (e.Status != GestureStatus.Running) return;
-        _window.Zoom(e.Scale, e.ScaleOrigin.X, TrendDrawable.DataSpan(Samples));
-        Invalidate();
+        if (e.Status == GestureStatus.Running)
+            ZoomAt(e.Scale, e.ScaleOrigin.X);
     }
 
 #if WINDOWS
@@ -103,8 +126,7 @@ public sealed class TrendView : GraphicsView
         var point = e.GetCurrentPoint(_wheelSource);
         var delta = point.Properties.MouseWheelDelta;
         if (delta == 0 || point.Properties.IsHorizontalMouseWheel) return;
-        _window.Zoom(Math.Pow(1.2, delta / 120.0), point.Position.X / Width, TrendDrawable.DataSpan(Samples));
-        Invalidate();
+        ZoomAt(Math.Pow(1.2, delta / 120.0), point.Position.X / Width);
         e.Handled = true;
     }
 #endif
@@ -116,10 +138,9 @@ public sealed class TrendView : GraphicsView
             case GestureStatus.Started:
                 _lastPanX = 0;
                 break;
-            case GestureStatus.Running when Width > 0:
-                _window.Pan((e.TotalX - _lastPanX) / Width, TrendDrawable.DataSpan(Samples));
+            case GestureStatus.Running:
+                PanBy(e.TotalX - _lastPanX);
                 _lastPanX = e.TotalX;
-                Invalidate();
                 break;
         }
     }

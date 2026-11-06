@@ -20,6 +20,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!-- The Linux head's BlueZ names and choices, which need no D-Bus or GTK. -->
+		<Compile Include="..\Readout.Linux\BlueZ\BlueZNames.cs" Link="Linux\BlueZNames.cs" />
+		<Compile Include="..\Readout.Linux\BlueZ\RecentRssi.cs" Link="Linux\RecentRssi.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<!-- FakeTimeProvider: the simulated meter's clock stands still unless a test moves it. -->
 		<PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
 		<PackageReference Include="xunit.v3" Version="4.0.2" />

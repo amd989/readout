@@ -1,6 +1,6 @@
 # Using Readout with Claude (MCP)
 
-On Mac and Windows, Readout can run a small [Model Context Protocol](https://modelcontextprotocol.io)
+On Mac, Windows and Linux, Readout can run a small [Model Context Protocol](https://modelcontextprotocol.io)
 server so an AI assistant such as Claude can use your 121GW: read it, look at recent
 readings, press its buttons and save sessions. It's off until you turn it on.
 
@@ -125,5 +125,5 @@ The HTTP itself is a small reader and writer on a loopback-bound `TcpListener`, 
 
 The Mac app needs the `com.apple.security.network.server` entitlement for it.
 
-`Readout.Mcp` is plain `net10.0` with no UI, so a future Linux front end or a command-line tool
-can host the same tools.
+`Readout.Mcp` is plain `net10.0` with no UI, so the Mac and Windows apps and the Linux build
+(`Readout.Linux`) all host the same tools, and a command-line tool could too.

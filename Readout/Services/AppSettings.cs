@@ -21,8 +21,12 @@ public sealed class AppSettings
         set => Set("continuity-sound", value);
     }
 
-    /// <summary>PCs have nothing to vibrate, so Windows hides the setting and never vibrates.</summary>
+    /// <summary>PCs have nothing to vibrate, so Windows and Linux hide the setting and never vibrate.</summary>
+#if LINUX
+    public static bool CanVibrate => false;
+#else
     public static bool CanVibrate => DeviceInfo.Platform != DevicePlatform.WinUI;
+#endif
 
     public bool ContinuityVibration
     {

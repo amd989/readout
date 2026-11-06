@@ -8,6 +8,9 @@ public partial class AboutPage : ContentPage
     {
         InitializeComponent();
         VersionLabel.Text = $"Version {Services.AppVersion.Text}";
+#if LINUX
+        LinuxCredits.IsVisible = true;
+#endif
         LicenseLabel.Text = MitLicense;
     }
 
