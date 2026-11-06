@@ -75,6 +75,23 @@ static void reportQuiet() {
                                          : "changing, but no bytes: check the inversion setting";
   Serial.printf("no data for %lu s; GPIO %d is %s (%lu%% high)\n", (unsigned long)(QUIET_REPORT_MS / 1000),
                 METER_RX_PIN, level, (unsigned long)(total ? samplesHigh * 100 / total : 0));
+
+  // How far the line actually swings, measured over half a second (frames come about 3 a
+  // second): an optocoupler that gets some light but too little pulls it only partway down.
+  // The ESP32 reads below about 0.8 V as low.
+  uint32_t lowest = UINT32_MAX, highest = 0;
+  uint32_t until = millis() + 500;
+  while ((int32_t)(millis() - until) < 0) {
+    uint32_t mv = analogReadMilliVolts(METER_RX_PIN);
+    if (mv < lowest) lowest = mv;
+    if (mv > highest) highest = mv;
+  }
+  Serial.printf("  GPIO %d swings %lu–%lu mV%s\n", METER_RX_PIN, (unsigned long)lowest, (unsigned long)highest,
+                lowest > 800 && highest - lowest > 200 ? ": the optocoupler dips but not to a low; try a larger pull-up or more LED current" : "");
+  // Measuring switched the pin to analog (it reads as low then) and took it from the UART;
+  // make it a digital input again and give it back.
+  pinMode(METER_RX_PIN, INPUT);
+  meter.begin(METER_BAUD, SERIAL_8N1, METER_RX_PIN, METER_TX_PIN, METER_RX_INVERTED != 0);
 }
 
 static void setLed(bool on);
