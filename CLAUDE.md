@@ -32,7 +32,7 @@ dotnet build Readout -f net10.0-android
 ./publish-ios.sh       # Release .ipa for TestFlight / App Store (fails on any non-arm64 slice)
 ./publish-mac.sh       # Release .pkg for the Mac App Store (universal, sandboxed)
 ./publish-windows.ps1  # Release .msix (x64 + arm64) for the Microsoft Store; -Test -Install for a local copy
-pio run -d firmware/fs9721-bridge -e esp32dev -t upload   # the FS9721 bridge (or -e esp32c3)
+./deploy-esp.sh       # build and flash the FS9721 bridge to an ESP32 on USB (--log follows it; other builds: esp32dev-vdd, esp32c3…)
 ```
 
 ## Things to know

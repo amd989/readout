@@ -97,7 +97,14 @@ draws a few hundred microamps through its USB chip, which a 500 mAh cell lasts w
 
 ## Build and flash
 
-With [PlatformIO](https://platformio.org) (the CLI, or the VS Code extension):
+With [PlatformIO](https://platformio.org) installed, from the repository's root:
+
+```bash
+./deploy-esp.sh --log             # finds the board, builds, flashes, then follows its output
+./deploy-esp.sh esp32dev-vdd      # another build: see Wiring
+```
+
+Or with PlatformIO directly (the CLI, or the VS Code extension):
 
 ```bash
 cd firmware/fs9721-bridge
