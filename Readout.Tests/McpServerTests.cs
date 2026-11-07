@@ -139,6 +139,43 @@ public sealed class McpServerTests : IAsyncLifetime
         Assert.Equal([(MeterKey.Hold, false), (MeterKey.Range, true)], _bluetooth.Keys);
     }
 
+    private static readonly DiscoveredMeter Bridge = new("cc:dd", "Readout FS9721 B1CC", -50, Readout.Core.Display.MeterModel.Fs9721);
+
+    private async Task ConnectBridgeWithReading()
+    {
+        await _session.ConnectAsync(Bridge, TestContext.Current.CancellationToken);
+        _bluetooth.Send(Convert.FromHexString("17253b4f5f677f879fa0b0c0d4e8"));
+    }
+
+    [Fact]
+    public async Task Status_SaysTheMeterTypeAndWhetherItTakesButtons()
+    {
+        await ConnectMeterWithReading();
+        var (gw, _, _) = await Call("get_status");
+        await _session.DisconnectAsync();
+        await ConnectBridgeWithReading();
+        var (bridge, _, _) = await Call("get_status");
+
+        Assert.Equal(("121GW", true), (gw.GetProperty("meter_type").GetString(), gw.GetProperty("remote_buttons").GetBoolean()));
+        Assert.Equal(("FS9721", false), (bridge.GetProperty("meter_type").GetString(), bridge.GetProperty("remote_buttons").GetBoolean()));
+        Assert.Equal("2.888 V", bridge.GetProperty("reading").GetProperty("display").GetString());
+    }
+
+    [Fact]
+    public async Task PressButtonAndSyncClock_OnABridgedMeter_SayItCant()
+    {
+        await ConnectBridgeWithReading();
+
+        var (_, pressError, pressText) = await Call("press_button", new() { ["button"] = "HOLD" });
+        var (_, syncError, syncText) = await Call("sync_clock");
+
+        Assert.True(pressError);
+        Assert.Contains("only on the meter itself", pressText, StringComparison.Ordinal);
+        Assert.True(syncError);
+        Assert.Contains("no clock", syncText, StringComparison.Ordinal);
+        Assert.Empty(_bluetooth.Keys);
+    }
+
     [Fact]
     public async Task PressButton_RefusesToHoldPeak_AndUnknownButtons()
     {

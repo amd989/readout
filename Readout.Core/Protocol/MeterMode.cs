@@ -50,6 +50,13 @@ public enum MeterMode : byte
     LcdContrast = 160,
     Dbm = 180,
     Interval = 190,
+
+    // Never sent by the 121GW: modes of other meters.
+
+    /// <summary>Transistor gain (hFE), from FS9721 meters.</summary>
+    Hfe = 200,
+    /// <summary>A function another meter's decoder can't tell from its display.</summary>
+    Unknown = 255,
 }
 
 /// <summary>The AC/DC annunciators, from status byte 1.</summary>

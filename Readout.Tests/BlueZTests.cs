@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Time.Testing;
+using Readout.Core.Display;
+using Readout.Core.Protocol;
 using Readout.Linux.BlueZ;
 
 namespace Readout.Tests;
@@ -44,8 +46,28 @@ public class BlueZNamesTests
     [InlineData(null, "121GW", "121GW")]          // only the alias (renamed, or the name not seen yet)
     [InlineData("Kitchen", "Kitchen", null)]
     [InlineData(null, "88-6B-0F-12-34-56", null)] // no name: BlueZ's alias is the address
+    [InlineData("Readout FS9721 B1CC", null, "Readout FS9721 B1CC")] // a bridge
     public void MeterName_ComesFromTheNameOrAlias(string? name, string? alias, string? expected) =>
         Assert.Equal(expected, BlueZNames.MeterName(name, alias));
+
+    [Theory]
+    [InlineData("121GW", MeterModel.Eevblog121Gw)]
+    [InlineData("Bluegiga", MeterModel.Eevblog121Gw)]
+    [InlineData("Readout FS9721 B1CC", MeterModel.Fs9721)]
+    public void Model_ComesFromTheName(string name, MeterModel model) =>
+        Assert.Equal(model, BlueZNames.ModelFromName(name));
+
+    [Fact]
+    public void BridgeDataCharacteristic_IsFoundByUuid()
+    {
+        var picked = BlueZNames.PickDataCharacteristic(
+        [
+            new(Device + "/service0010/char0011", BridgeBluetooth.ServiceUuid.ToString(), BridgeBluetooth.InfoCharacteristicUuid.ToString(), ["read"]),
+            new(Device + "/service0010/char0013", BridgeBluetooth.ServiceUuid.ToString(), BridgeBluetooth.DataCharacteristicUuid.ToString(), ["notify"]),
+        ]);
+
+        Assert.Equal(Device + "/service0010/char0013", picked?.Path);
+    }
 
     [Fact]
     public void DataCharacteristic_IsFoundByUuid_InAnyCase()

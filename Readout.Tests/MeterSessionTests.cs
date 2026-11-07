@@ -18,7 +18,7 @@ internal sealed class FakeBluetooth : IMeterConnection
 
     public event EventHandler? StateChanged;
     public event EventHandler<DiscoveredMeter>? MeterDiscovered;
-    public event EventHandler<MeterPacket>? PacketReceived;
+    public event EventHandler<ReadOnlyMemory<byte>>? DataReceived;
     public event EventHandler? ConnectionLost;
 
     public Task StartScanAsync(CancellationToken ct = default)
@@ -61,7 +61,8 @@ internal sealed class FakeBluetooth : IMeterConnection
     }
 
     public void Discover(DiscoveredMeter meter) => MeterDiscovered?.Invoke(this, meter);
-    public void Send(MeterPacket packet) => PacketReceived?.Invoke(this, packet);
+    public void Send(MeterPacket packet) => Send(packet.Bytes.ToArray());
+    public void Send(byte[] bytes) => DataReceived?.Invoke(this, bytes);
 
     public void Drop()
     {
@@ -107,6 +108,73 @@ public sealed class MeterSessionTests : IDisposable
         Assert.Equal("12.345 V", Assert.Single(readings).MainLine);
         Assert.Equal(1, _session.Log.Count);
         Assert.Same(readings[0], _session.Latest);
+    }
+
+    private static readonly DiscoveredMeter Bridge = new("cc:dd", "Readout FS9721", -60, MeterModel.Fs9721);
+
+    // 2.888 V DC on auto range, as an FS9721 sends it.
+    private static readonly byte[] Fs9721Frame = Convert.FromHexString("17253b4f5f677f879fa0b0c0d4e8");
+
+    [Fact]
+    public async Task Fs9721Meter_FramesSplitAcrossNotifications_AreDecodedAndLogged()
+    {
+        await _session.ConnectAsync(Bridge);
+        _bluetooth.Send(Fs9721Frame[..5]);
+        _bluetooth.Send([.. Fs9721Frame[5..], .. Fs9721Frame[..3]]);
+        Assert.Equal(1, _session.Log.Count);
+        _bluetooth.Send(Fs9721Frame[3..]);
+
+        Assert.Equal(2, _session.Log.Count);
+        var r = _session.Latest!;
+        Assert.Equal((MeterModel.Fs9721, "2.888 V", MeterMode.DcVolts), (r.Model, r.MainLine, r.Mode));
+        Assert.Null(r.Packet);
+    }
+
+    [Fact]
+    public async Task Capabilities_FollowTheConnectedMeter()
+    {
+        Assert.True(_session.Capabilities.RemoteKeys);
+
+        await _session.ConnectAsync(Bridge);
+        Assert.Equal(MeterModel.Fs9721, _session.Model);
+        Assert.Equal(MeterCapabilities.Fs9721, _session.Capabilities);
+
+        // Keys go nowhere: the bridge only listens to its meter.
+        await _session.SendKeyAsync(MeterKey.Hold);
+        Assert.Empty(_bluetooth.Keys);
+
+        // After disconnecting, the last reading's meter still decides (the page keeps its LCD).
+        _bluetooth.Send(Fs9721Frame);
+        await _session.DisconnectAsync();
+        Assert.Equal(MeterModel.Fs9721, _session.Model);
+    }
+
+    [Fact]
+    public async Task SwitchingMeterModels_UsesEachModelsDriver()
+    {
+        await _session.ConnectAsync(Bridge);
+        _bluetooth.Send(Fs9721Frame);
+        Assert.Equal(MeterModel.Fs9721, _session.Latest!.Model);
+
+        await _session.DisconnectAsync();
+        await _session.ConnectAsync(Meter);
+        _bluetooth.Send(new PacketBuilder { MainRangeIndex = 1, MainRawValue = 12345 }.BuildPacket());
+
+        Assert.Equal((MeterModel.Eevblog121Gw, "12.345 V"), (_session.Latest!.Model, _session.Latest.MainLine));
+    }
+
+    [Fact]
+    public async Task Reconnect_PartialPacketFromTheLastLink_DoesNotCostTheFirstReading()
+    {
+        var packet = new PacketBuilder { MainRangeIndex = 1, MainRawValue = 12345 }.Build();
+        await _session.ConnectAsync(Meter);
+        _bluetooth.Send(packet[..10]);
+
+        _bluetooth.Drop();
+        await _session.ConnectAsync(Meter);
+        _bluetooth.Send(packet);
+
+        Assert.Equal("12.345 V", Assert.Single(_session.Log.Samples).Display);
     }
 
     [Fact]

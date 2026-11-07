@@ -1,4 +1,5 @@
 using Readout.Core.Connection;
+using Readout.Core.Display;
 using Readout.Core.Protocol;
 using Microsoft.Extensions.Logging;
 using Plugin.BLE.Abstractions;
@@ -15,8 +16,9 @@ public sealed class BluetoothUnavailableException(BluetoothState state)
 }
 
 /// <summary>
-/// The 121GW over Bluetooth LE, through Plugin.BLE (Android, iOS, Mac Catalyst, Windows).
-/// Subscribes to the meter's data characteristic and frames what arrives into packets.
+/// Meters over Bluetooth LE, through Plugin.BLE (Android, iOS, Mac Catalyst, Windows): the 121GW
+/// and Readout bridges (<see cref="BridgeBluetooth"/>). Subscribes to the meter's data
+/// characteristic and passes on what arrives; the session's driver frames it.
 /// </summary>
 public sealed class BleMeterConnection : IMeterConnection, IDisposable
 {
@@ -25,8 +27,6 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
     private readonly IBluetoothLE _ble;
     private readonly IAdapter _adapter;
     private readonly ILogger<BleMeterConnection> _logger;
-    private readonly PacketFramer _framer = new();
-    private readonly Lock _framerLock = new();
     private readonly Dictionary<Guid, IDevice> _seen = [];
 
     private CancellationTokenSource? _scanCts;
@@ -54,7 +54,7 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
 
     public event EventHandler? StateChanged;
     public event EventHandler<DiscoveredMeter>? MeterDiscovered;
-    public event EventHandler<MeterPacket>? PacketReceived;
+    public event EventHandler<ReadOnlyMemory<byte>>? DataReceived;
     public event EventHandler? ConnectionLost;
 
     public Task StartScanAsync(CancellationToken ct = default)
@@ -80,7 +80,7 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
             try
             {
                 await _adapter.StartScanningForDevicesAsync(
-                    deviceFilter: d => MeterBluetooth.IsMeterName(d.Name),
+                    deviceFilter: d => IsMeter(d.Name),
                     cancellationToken: ct);
             }
             catch (OperationCanceledException)
@@ -130,10 +130,8 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
             _device = device;
 
             var data = await FindDataCharacteristicAsync(device, timeout.Token)
-                ?? throw new InvalidOperationException("This device has no 121GW data characteristic.");
+                ?? throw new InvalidOperationException("This device has no meter data characteristic.");
 
-            lock (_framerLock)
-                _framer.Reset();
             data.ValueUpdated += OnValueUpdated;
             await data.StartUpdatesAsync(timeout.Token);
             _data = data;
@@ -184,7 +182,8 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
             var characteristics = await service.GetCharacteristicsAsync();
             foreach (var characteristic in characteristics)
             {
-                if (characteristic.Id == MeterBluetooth.DataCharacteristicUuid)
+                if (characteristic.Id == MeterBluetooth.DataCharacteristicUuid ||
+                    characteristic.Id == BridgeBluetooth.DataCharacteristicUuid)
                     return (characteristic, null);
                 if (fallback is null && characteristic.CanUpdate && !MeterBluetooth.StandardServices.Contains(service.Id))
                     fallback = characteristic;
@@ -218,6 +217,8 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
     public async Task SendKeyAsync(MeterKey key, bool longPress = false, CancellationToken ct = default)
     {
         if (_data is null) return;
+        // Bridges only listen to their meter; there's nothing to press.
+        if (Meter?.Model != MeterModel.Eevblog121Gw) return;
         var command = MeterCommands.KeyPress(key, longPress);
         _logger.LogInformation("key {Key} (long: {Long})", key, longPress);
         await _data.WriteAsync(command, ct);
@@ -271,23 +272,23 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
     private void OnDeviceDiscovered(object? sender, DeviceEventArgs e)
     {
         var device = e.Device;
-        if (!MeterBluetooth.IsMeterName(device.Name)) return;
+        if (!IsMeter(device.Name)) return;
 
         _seen[device.Id] = device;
-        MeterDiscovered?.Invoke(this, new DiscoveredMeter(device.Id.ToString(), device.Name, device.Rssi));
+        var model = BridgeBluetooth.ModelFromName(device.Name) ?? MeterModel.Eevblog121Gw;
+        MeterDiscovered?.Invoke(this, new DiscoveredMeter(device.Id.ToString(), device.Name, device.Rssi, model));
     }
+
+    private static bool IsMeter(string? name) =>
+        MeterBluetooth.IsMeterName(name) || BridgeBluetooth.ModelFromName(name) is not null;
 
     private void OnValueUpdated(object? sender, CharacteristicUpdatedEventArgs e)
     {
         var value = e.Characteristic.Value;
         if (value is null || value.Length == 0) return;
 
-        IReadOnlyList<MeterPacket> packets;
-        lock (_framerLock)
-            packets = _framer.Push(value);
-
-        foreach (var packet in packets)
-            PacketReceived?.Invoke(this, packet);
+        // Copied: the platform may reuse the buffer, and the session reads it later on the main thread.
+        DataReceived?.Invoke(this, value.ToArray());
     }
 
     private void OnLinkDropped(IDevice device, string? error)

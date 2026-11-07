@@ -6,7 +6,7 @@ Guidance for Claude Code when working in this repository.
 
 Readout is a companion app for the EEVblog 121GW multimeter over Bluetooth LE, built with .NET 10 and .NET MAUI. It's open source (MIT) and meant for the App Store, Google Play and the Microsoft Store, with a Linux build on MAUI's preview GTK4 backend.
 
-- `Readout.Core/` (plain `net10.0`, warnings are errors): the protocol (`Protocol/`: `MeterPacket`, `PacketFramer`, `MeterCommands`, `MeterBluetooth`), LCD decoding (`Display/`: `ReadingDecoder`, `ModeInfo` range tables, `SiFormat`), logging and CSV (`Logging/`), the simulated meter (`Simulation/`), and the connection contract plus session (`Connection/`: `IMeterConnection`, `SimulatedMeterConnection`, `MeterSession`). No MAUI or Bluetooth stack here.
+- `Readout.Core/` (plain `net10.0`, warnings are errors): the protocol (`Protocol/`: `MeterPacket`, `PacketFramer`, `MeterCommands`, `MeterBluetooth`), LCD decoding (`Display/`: `ReadingDecoder`, `ModeInfo` range tables, `SiFormat`), logging and CSV (`Logging/`), the simulated meter (`Simulation/`), and the connection contract plus session (`Connection/`: `IMeterConnection`, `SimulatedMeterConnection`, `MeterSession`). Connections only move bytes; `MeterSession` turns them into readings with the `IMeterDriver` for the meter's model (`Eevblog121GwDriver`, `Fs9721Driver`). No MAUI or Bluetooth stack here.
 - `Readout/`: the MAUI app. `Services/BleMeterConnection` implements `IMeterConnection` over Plugin.BLE. `ViewModels/` use CommunityToolkit.Mvvm. `Drawing/` draws the LCD (`LcdDrawable`, `SevenSegment`) and the trend graph with MAUI Graphics.
 - `Readout.Core/Logging/`: `MeasurementLog` (the live log), `SampleCsv` (the CSV format, written and read), `SessionStore` (saved sessions: `{id}.csv` + `{id}.json` in the app data folder), `RecordingAutosave` (appends the live log to `recording.csv` every 10 s and on sleep, restored at launch). `Display/TrendWindow` is the graph's zoom and pan; `Display/TrendBucket` groups long logs into time slots (the graph draws each slot's average as the line over a faint min/max band, so noisy readings don't fill the plot).
 - `Readout.Core/Feedback/`: `ContinuityAlert` (on/off with hysteresis for continuity and resistance) and `ToneWave` (the looping beep). `Readout/Services/ContinuityFeedback` plays it through `ContinuityTone` (per platform) and vibrates; `AppSettings` holds the Settings tab's values in Preferences.
@@ -16,6 +16,7 @@ Readout is a companion app for the EEVblog 121GW multimeter over Bluetooth LE, b
 - `Readout.Linux/`: the Linux head (see Linux below). `BlueZ/` is the meter connection over BlueZ; the other files fill gaps in the GTK backend.
 - `Readout.Tests/`: xUnit v3 tests for the core and the MCP server (end to end with the SDK's client), plus the Linux head's `BlueZNames` and `RecentRssi`, compiled in as linked files (they must stay free of D-Bus and GTK).
 - `docs/PROTOCOL.md`: the packet format. Read it before touching `Protocol/` or `Display/`.
+- `Readout.Core/Fs9721/`: the decoder for Fortune FS9721_LP3 meters (a DIY Bluetooth bridge on cheap meters), written from Fortune's datasheet. Readings go through the same log, graphs and MCP tools. `firmware/fs9721-bridge/` is the ESP32 bridge (PlatformIO, NimBLE) that forwards the chip's bytes over BLE; its UUIDs and name must match `Protocol/BridgeBluetooth` (a test checks). `docs/FS9721.md` has the frame format and the plan. Tests use real frames from `Readout.Tests/TestData/fs9721-890g.txt`.
 
 The protocol is ported from the official EEVblog app's `PrivatePostRelease` branch (https://gitlab.com/eevblog/app-121gw, MIT, David Ledger), and matches EEVblog's "Revised Packet Format Blob V2" document. Its `master` branch has an obsolete 52-character text parser; ignore it. Keep the David Ledger credit in THIRD_PARTY_NOTICES.md and the About page.
 
@@ -36,6 +37,7 @@ dotnet build Readout -f net10.0-android
 git tag v1.2.0 && git push origin v1.2.0   # release.yml: every store + a GitHub release (docs/STORE-CI.md)
 dotnet build Readout.Linux       # the Linux head (plain net10.0, builds on the Mac too, no workload)
 ./publish-linux.sh x64 arm64     # self-contained Readout-linux-<arch>.tar.gz in Readout.Linux/bin/publish/
+./deploy-esp.sh       # build and flash the FS9721 bridge to an ESP32 on USB (--log follows it; other builds: esp32dev-vdd, esp32c3…)
 ```
 
 ## Things to know

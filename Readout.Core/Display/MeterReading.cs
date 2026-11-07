@@ -2,10 +2,23 @@ using Readout.Core.Protocol;
 
 namespace Readout.Core.Display;
 
-/// <summary>Everything the meter's LCD shows for one packet, decoded for display and logging.</summary>
+/// <summary>The kinds of meter Readout can decode.</summary>
+public enum MeterModel
+{
+    /// <summary>The EEVblog 121GW, over its own Bluetooth.</summary>
+    Eevblog121Gw,
+    /// <summary>A meter built on Fortune's FS9721_LP3 chip, through a DIY Bluetooth bridge.</summary>
+    Fs9721,
+}
+
+/// <summary>Everything the meter's LCD shows for one packet or frame, decoded for display and logging.</summary>
 public sealed record MeterReading
 {
-    public required MeterPacket Packet { get; init; }
+    public required MeterModel Model { get; init; }
+    /// <summary>The packet or frame as the meter sent it.</summary>
+    public required ReadOnlyMemory<byte> Raw { get; init; }
+    /// <summary>The decoded 121GW packet; null for other meters.</summary>
+    public MeterPacket? Packet { get; init; }
     public required DateTimeOffset ReceivedAt { get; init; }
 
     public required MeterMode Mode { get; init; }
@@ -36,7 +49,8 @@ public sealed record MeterReading
     /// </summary>
     public bool Blank { get; init; }
 
-    public int Serial => Packet.Serial;
+    /// <summary>The 121GW's serial number; null for other meters.</summary>
+    public int? Serial => Packet?.Serial;
 
     /// <summary>The main reading as one line: "-12.106 mV", "OFL kΩ".</summary>
     public string MainLine =>
@@ -50,6 +64,9 @@ public sealed record MeterReading
 /// <param name="Label">What a SETUP page shows ("Battery", "Year"); null for live readings.</param>
 public sealed record SubDisplay(string Text, bool Negative, string Unit, string? Label)
 {
+    /// <summary>For meters without a small display.</summary>
+    public static readonly SubDisplay None = new("", false, "", null);
+
     public string Line => $"{(Negative ? "-" : "")}{Text} {Unit}".TrimEnd();
 }
 
@@ -62,6 +79,9 @@ public sealed record SubDisplay(string Text, bool Negative, string Unit, string?
 public sealed record BarGraph(bool On, int Segments, bool Negative, BarScale Scale, bool Ticks150)
 {
     public const int TotalSegments = 26;
+
+    /// <summary>For meters without a bar graph.</summary>
+    public static readonly BarGraph Off = new(false, 0, false, BarScale.Five, false);
 
     public int FullScale => Scale switch
     {

@@ -1,3 +1,4 @@
+using Readout.Core.Display;
 using Readout.Core.Protocol;
 
 namespace Readout.Linux.BlueZ;
@@ -48,13 +49,26 @@ internal static class BlueZNames
         path.StartsWith(devicePath + "/", StringComparison.Ordinal);
 
     /// <summary>
-    /// The name a device advertised, if it looks like a 121GW. BlueZ's Alias is the name unless
-    /// the user renamed the device, or the address (with dashes) when it has none.
+    /// The name a device advertised, if it looks like a meter: a 121GW, or a Readout bridge
+    /// ("Readout FS9721 A1B2"). BlueZ's Alias is the name unless the user renamed the device, or
+    /// the address (with dashes) when it has none.
     /// </summary>
     public static string? MeterName(string? name, string? alias) =>
-        MeterBluetooth.IsMeterName(name) ? name
-        : MeterBluetooth.IsMeterName(alias) ? alias
+        IsMeter(name) ? name
+        : IsMeter(alias) ? alias
         : null;
+
+    /// <summary>The kind of meter a name says: a bridge's chip, else a 121GW.</summary>
+    public static MeterModel ModelFromName(string name) =>
+        BridgeBluetooth.ModelFromName(name) ?? MeterModel.Eevblog121Gw;
+
+    private static bool IsMeter(string? name) =>
+        MeterBluetooth.IsMeterName(name) || BridgeBluetooth.ModelFromName(name) is not null;
+
+    /// <summary>The 121GW's or a bridge's data characteristic.</summary>
+    public static bool IsKnownDataCharacteristic(string uuid) =>
+        Guid.TryParse(uuid, out var id) &&
+        (id == MeterBluetooth.DataCharacteristicUuid || id == BridgeBluetooth.DataCharacteristicUuid);
 
     /// <summary>
     /// Whether BlueZ can only connect over LE: the device advertises from a random address
@@ -67,14 +81,14 @@ internal static class BlueZNames
         (advertisingFlags is { Length: > 0 } && (advertisingFlags[0] & 0x04) != 0);
 
     /// <summary>
-    /// The meter's data characteristic: by UUID, else the first one that can notify or indicate
+    /// The meter's data characteristic: by UUID (the 121GW's or a bridge's), else the first one that can notify or indicate
     /// outside the standard services, as on the other platforms. In BlueZ's path order, which is
     /// the device's handle order.
     /// </summary>
     public static GattCharacteristicInfo? PickDataCharacteristic(IEnumerable<GattCharacteristicInfo> characteristics)
     {
         var ordered = characteristics.OrderBy(c => c.Path, StringComparer.Ordinal).ToList();
-        return ordered.FirstOrDefault(c => Guid.TryParse(c.Uuid, out var id) && id == MeterBluetooth.DataCharacteristicUuid)
+        return ordered.FirstOrDefault(c => IsKnownDataCharacteristic(c.Uuid))
             ?? ordered.FirstOrDefault(c => c.CanUpdate &&
                 !(Guid.TryParse(c.ServiceUuid, out var service) && MeterBluetooth.StandardServices.Contains(service)));
     }

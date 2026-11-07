@@ -5,8 +5,10 @@ namespace Readout.Mcp;
 
 // What the tools return, as JSON. Source-generated, so it works in trimmed release builds.
 
+/// <param name="MeterType">"121GW", or the chip behind a Readout bridge ("FS9721").</param>
+/// <param name="RemoteButtons">Whether press_button and sync_clock work with this meter.</param>
 public sealed record StatusResult(
-    string Connection, string? Meter, bool Demo, int? SignalDbm, string? Signal,
+    string Connection, string? Meter, string MeterType, bool RemoteButtons, bool Demo, int? SignalDbm, string? Signal,
     double? BatteryVolts, bool LowBattery, bool Logging, int LoggedReadings, ReadingResult? Reading);
 
 /// <param name="Display">The main reading as the LCD shows it, with its unit ("12.106 mV").</param>

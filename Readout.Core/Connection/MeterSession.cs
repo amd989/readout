@@ -5,8 +5,9 @@ using Readout.Core.Protocol;
 namespace Readout.Core.Connection;
 
 /// <summary>
-/// The app's one meter: picks Bluetooth or the demo meter, decodes packets into readings,
-/// logs them, and reconnects to the remembered meter when it's seen again or the link drops.
+/// The app's one meter: picks Bluetooth or the demo meter, turns its data into readings with
+/// the driver for its model, logs them, and reconnects to the remembered meter when it's seen
+/// again or the link drops.
 /// </summary>
 /// <remarks>
 /// Connection events can arrive on any thread; the session raises its own events through
@@ -31,8 +32,8 @@ public sealed class MeterSession
 
         foreach (var connection in new[] { bluetooth, demo })
         {
-            connection.StateChanged += (s, _) => { if (s == Active) Dispatch(() => StateChanged?.Invoke(this, EventArgs.Empty)); };
-            connection.PacketReceived += (s, p) => { if (s == Active) Dispatch(() => OnPacket(p)); };
+            connection.StateChanged += (s, _) => { if (s == Active) Dispatch(OnStateChanged); };
+            connection.DataReceived += (s, d) => { if (s == Active) Dispatch(() => OnData(d)); };
         }
         bluetooth.MeterDiscovered += (_, m) => Dispatch(() => OnDiscovered(m));
         bluetooth.ConnectionLost += (_, _) => Dispatch(OnConnectionLost);
@@ -51,6 +52,12 @@ public sealed class MeterSession
     public bool IsDemo => Active == _demo;
     public ConnectionState State => Active.State;
     public DiscoveredMeter? Meter => Active.Meter;
+
+    /// <summary>The kind of meter: the connected one's, else the last reading's (a 121GW before any).</summary>
+    public MeterModel Model => Active.Meter?.Model ?? Latest?.Model ?? MeterModel.Eevblog121Gw;
+
+    /// <summary>What <see cref="Model"/> can do beyond sending readings.</summary>
+    public MeterCapabilities Capabilities => MeterCapabilities.For(Model);
 
     public MeasurementLog Log { get; } = new();
 
@@ -105,9 +112,8 @@ public sealed class MeterSession
     private static readonly TimeSpan SentKeyEcho = TimeSpan.FromSeconds(1.5);
     private readonly Dictionary<MeterKey, DateTimeOffset> _sentKeys = [];
 
-    /// <summary>How long after a mode change a 0 can be the meter's blank display.</summary>
-    private static readonly TimeSpan BlankAfterModeChange = TimeSpan.FromSeconds(2.5);
-    private DateTimeOffset? _modeChangedAt;
+    /// <summary>Turns the active meter's bytes into readings; replaced when a different model connects.</summary>
+    private IMeterDriver _driver = MeterDrivers.For(MeterModel.Eevblog121Gw);
 
     /// <summary>Starts looking for meters.</summary>
     /// <param name="autoConnect">
@@ -168,7 +174,7 @@ public sealed class MeterSession
 
     public Task SendKeyAsync(MeterKey key, bool longPress = false, CancellationToken ct = default)
     {
-        if (Active.State != ConnectionState.Connected)
+        if (Active.State != ConnectionState.Connected || !Capabilities.RemoteKeys)
             return Task.CompletedTask;
         lock (_sentKeys)
             _sentKeys[key] = _time.GetUtcNow();
@@ -184,38 +190,31 @@ public sealed class MeterSession
         Dispatch(() => StateChanged?.Invoke(this, EventArgs.Empty));
     }
 
-    private void OnPacket(MeterPacket packet)
+    private void OnStateChanged()
     {
-        var now = _time.GetLocalNow();
-        var reading = ReadingDecoder.Decode(packet, now, Latest?.Sub.Label);
-        var pressed = Latest is { } previous ? KeyInference.Infer(previous.Packet, packet) : null;
+        // A new link starts mid-stream; a partial packet from the last one would garble the first.
+        if (Active.State == ConnectionState.Connected)
+            _driver.Reset();
+        StateChanged?.Invoke(this, EventArgs.Empty);
+    }
 
-        // After a mode change the meter's display stays blank until it has measured, but its
-        // packets say 0 (a real meter, on temperature, for about two seconds). The same after
-        // each range step while autoranging (on Ω, stepping up to OFL), with a bar that jumps.
-        if (Latest is { } last && (last.Packet.Mode != packet.Mode ||
-            (last.Packet.Coupling == Coupling.AcPlusDc) != (packet.Coupling == Coupling.AcPlusDc) ||
-            (packet.AutoRange && last.Packet.MainRangeIndex != packet.MainRangeIndex)))
-            _modeChangedAt = now;
-        if (_modeChangedAt is { } changed)
+    private void OnData(ReadOnlyMemory<byte> data)
+    {
+        var model = Active.Meter?.Model ?? _driver.Model;
+        if (model != _driver.Model)
+            _driver = MeterDrivers.For(model);
+
+        foreach (var (reading, pressed, battery) in _driver.Receive(data.Span, _time.GetLocalNow()))
         {
-            if (!packet.MainOverload && packet.MainRawValue == 0 && now - changed < BlankAfterModeChange)
-                reading = reading with
-                {
-                    Blank = true, MainText = "", MainNegative = false, MainUnit = "", Value = null, BaseValue = null,
-                    Bar = reading.Bar with { Segments = 0 },
-                };
-            else
-                _modeChangedAt = null;
+            Latest = reading;
+            if (pressed is { } press && !SentRecently(press.Key))
+                KeyPressed?.Invoke(this, press);
+            if (battery is { } volts)
+                BatteryVolts = volts;
+            if (IsLogging && !reading.Blank)
+                Log.Add(reading);
+            ReadingReceived?.Invoke(this, reading);
         }
-        Latest = reading;
-        if (pressed is { } press && !SentRecently(press.Key))
-            KeyPressed?.Invoke(this, press);
-        if (packet.SubMode == MeterMode.Battery && !packet.SubOverload)
-            BatteryVolts = packet.SubRawValue / Math.Pow(10, packet.SubDecimals);
-        if (IsLogging && !reading.Blank)
-            Log.Add(reading);
-        ReadingReceived?.Invoke(this, reading);
     }
 
     private bool SentRecently(MeterKey key)

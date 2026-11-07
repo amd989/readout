@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Plugin.BLE.Abstractions.Contracts;
 using Readout.Core.Connection;
+using Readout.Core.Display;
 using Readout.Core.Protocol;
 using Readout.Services;
 using Tmds.DBus.Protocol;
@@ -24,7 +25,6 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
 
     private readonly BlueZBus _bus;
     private readonly ILogger<BlueZMeterConnection> _logger;
-    private readonly PacketFramer _framer = new();
     private readonly RecentRssi _rssi = new(TimeProvider.System);
     private readonly Lock _gate = new();
     private readonly Task<bool> _ready;
@@ -63,7 +63,7 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
 
     public event EventHandler? StateChanged;
     public event EventHandler<DiscoveredMeter>? MeterDiscovered;
-    public event EventHandler<MeterPacket>? PacketReceived;
+    public event EventHandler<ReadOnlyMemory<byte>>? DataReceived;
     public event EventHandler? ConnectionLost;
 
     /// <summary>On with a powered adapter, Off with an unpowered one, Unavailable with none (or no BlueZ).</summary>
@@ -232,13 +232,12 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
             await Task.Delay(100, ct).ConfigureAwait(false);
 
         var data = BlueZNames.PickDataCharacteristic(await CharacteristicsAsync(devicePath).ConfigureAwait(false))
-            ?? throw new InvalidOperationException("This device has no 121GW data characteristic.");
-        if (!Guid.TryParse(data.Uuid, out var uuid) || uuid != MeterBluetooth.DataCharacteristicUuid)
+            ?? throw new InvalidOperationException("This device has no meter data characteristic.");
+        if (!BlueZNames.IsKnownDataCharacteristic(data.Uuid))
             _logger.LogWarning("data characteristic not found by UUID, using {Uuid}", data.Uuid);
 
         lock (_gate)
         {
-            _framer.Reset();
             _dataPath = data.Path;
             _writeType = BlueZNames.WriteType(data.Flags);
         }
@@ -364,6 +363,8 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
         string writeType;
         lock (_gate) (dataPath, writeType) = (_dataPath, _writeType);
         if (dataPath is null) return;
+        // Bridges only listen to their meter; there's nothing to press.
+        if (Meter?.Model != MeterModel.Eevblog121Gw) return;
 
         _logger.LogInformation("key {Key} (long: {Long})", key, longPress);
         await _bus.WriteValueAsync(dataPath, MeterCommands.KeyPress(key, longPress), writeType).WaitAsync(ct).ConfigureAwait(false);
@@ -429,14 +430,10 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
                 break;
 
             case BlueZNames.GattCharacteristic1 when changed.Bytes("Value") is { Length: > 0 } value:
-                IReadOnlyList<MeterPacket> packets;
                 lock (_gate)
-                {
                     if (path != _dataPath) return;
-                    packets = _framer.Push(value);
-                }
-                foreach (var packet in packets)
-                    PacketReceived?.Invoke(this, packet);
+                // As it arrived; the session's driver for the meter's model frames it.
+                DataReceived?.Invoke(this, value);
                 break;
         }
     }
@@ -488,7 +485,7 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
         }
         if (rssi is null) return;
         if (first) _logger.LogInformation("scan: found {Name} at {Address}, {Rssi} dBm", name, address, rssi);
-        MeterDiscovered?.Invoke(this, new DiscoveredMeter(address, name, rssi.Value));
+        MeterDiscovered?.Invoke(this, new DiscoveredMeter(address, name, rssi.Value, BlueZNames.ModelFromName(name)));
     }
 
     private void StopScanReport()
