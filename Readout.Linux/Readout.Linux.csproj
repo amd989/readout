@@ -14,7 +14,8 @@
 		<AssemblyName>Readout</AssemblyName>
 		<ApplicationId>md.alejandro.readout</ApplicationId>
 		<ApplicationTitle>Readout</ApplicationTitle>
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<!-- Keep in step with Readout/Readout.csproj. -->
+		<ApplicationDisplayVersion>1.2</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 		<!-- What About shows: GTK's AppInfo reads the assembly version and the informational version. -->
 		<Version>$(ApplicationDisplayVersion)</Version>

@@ -21,7 +21,7 @@
 		<ApplicationId>md.alejandro.readout</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.2</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 
 		<!-- Windows: Debug is a plain .exe (quick to run); Release is an MSIX package for the
