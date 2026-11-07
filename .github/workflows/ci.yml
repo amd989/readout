@@ -32,8 +32,28 @@ jobs:
       - name: Build
         run: dotnet build Readout.Tests --configuration Release
 
+      # Coverage of Readout.Core and Readout.Mcp; the settings are in Readout.Tests/testconfig.json.
       - name: Test
-        run: dotnet test --project Readout.Tests --configuration Release --no-build
+        run: >
+          dotnet test --project Readout.Tests --configuration Release --no-build
+          --coverlet --results-directory TestResults/coverage
+
+      - name: Coverage summary
+        run: |
+          python3 - TestResults/coverage/coverage.cobertura.*.xml >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          import sys, xml.etree.ElementTree as ET
+          root = ET.parse(sys.argv[1]).getroot()
+          pct = lambda e, k: f"{100 * float(e.get(k)):.1f}%"
+          print("## Code coverage\n\n| Project | Lines | Branches |\n|---|---|---|")
+          for p in root.iter("package"):
+              print(f"| {p.get('name')} | {pct(p, 'line-rate')} | {pct(p, 'branch-rate')} |")
+          print(f"| **Total** | **{pct(root, 'line-rate')}** | **{pct(root, 'branch-rate')}** |")
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: TestResults/coverage/coverage.cobertura.*.xml
 
       # The Linux head is plain net10.0 on MAUI's GTK4 backend, so it builds here too.
       - name: Build Linux app

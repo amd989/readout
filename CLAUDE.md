@@ -24,6 +24,7 @@ The protocol is ported from the official EEVblog app's `PrivatePostRelease` bran
 
 ```bash
 dotnet test --project Readout.Tests
+dotnet test --project Readout.Tests --coverlet --results-directory TestResults/coverage   # + Cobertura coverage (testconfig.json)
 dotnet build Readout -f net10.0-ios -p:RuntimeIdentifier=iossimulator-arm64
 dotnet build Readout -f net10.0-maccatalyst
 dotnet build Readout -f net10.0-android

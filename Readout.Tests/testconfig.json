@@ -1,0 +1,12 @@
+{
+  "platformOptions": {
+    "Coverlet": {
+      // Only the app's own code: not the tests, not the generated JSON serializers in obj/.
+      "include": "[Readout.Core]*,[Readout.Mcp]*",
+      "excludeByAttribute": "ExcludeFromCodeCoverage,ExcludeFromCodeCoverageAttribute,GeneratedCodeAttribute,CompilerGeneratedAttribute",
+      "excludeByFile": "**/obj/**",
+      "format": "cobertura",
+      "excludeAssembliesWithoutSources": "MissingAll"
+    }
+  }
+}

@@ -80,6 +80,14 @@ for Apple targets and the Android SDK for Android.
 dotnet test --project Readout.Tests
 ```
 
+With `--coverlet`, the tests also measure code coverage of `Readout.Core` and `Readout.Mcp` and
+write a Cobertura report to `TestResults/coverage` (settings in `Readout.Tests/testconfig.json`).
+CI does this on every push and shows the numbers in the run's summary.
+
+```bash
+dotnet test --project Readout.Tests --coverlet --results-directory TestResults/coverage
+```
+
 ```bash
 dotnet build Readout -f net10.0-ios
 ```
