@@ -1,4 +1,4 @@
-#if MACCATALYST || WINDOWS
+#if MACCATALYST || WINDOWS || LINUX
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using Readout.Core.Connection;
@@ -9,7 +9,7 @@ namespace Readout.Services;
 
 /// <summary>
 /// Runs the MCP server for AI assistants while it's turned on in Settings, and restarts it
-/// when the port or token changes. Desktop only.
+/// when the port or token changes. Desktop only (Mac, Windows, Linux).
 /// </summary>
 public sealed class McpHost : IDisposable
 {
@@ -98,14 +98,14 @@ public sealed class McpHost : IDisposable
     private void SetStatus(string status)
     {
         Status = status;
-        MainThread.BeginInvokeOnMainThread(() => StatusChanged?.Invoke(this, EventArgs.Empty));
+        UiThread.Post(() => StatusChanged?.Invoke(this, EventArgs.Empty));
     }
 
     /// <summary>The meter session belongs to the main thread; MCP requests hop over to it.</summary>
     private sealed class MainThreadUiThread : IUiThread
     {
-        public Task<T> InvokeAsync<T>(Func<T> work) => MainThread.InvokeOnMainThreadAsync(work);
-        public Task<T> InvokeAsync<T>(Func<Task<T>> work) => MainThread.InvokeOnMainThreadAsync(work);
+        public Task<T> InvokeAsync<T>(Func<T> work) => UiThread.InvokeAsync(work);
+        public Task<T> InvokeAsync<T>(Func<Task<T>> work) => UiThread.InvokeAsync(work);
     }
 }
 #endif

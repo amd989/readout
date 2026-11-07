@@ -1,7 +1,7 @@
 # Readout
 
-A companion app for the **EEVblog 121GW** multimeter, for iPhone, iPad, Mac, Android and
-Windows. Built with .NET 10 and .NET MAUI.
+A companion app for the **EEVblog 121GW** multimeter, for iPhone, iPad, Mac, Android,
+Windows and Linux. Built with .NET 10 and .NET MAUI.
 
 **[Website](https://amd989.github.io/readout/)** · [Support](https://amd989.github.io/readout/support.html) ·
 [Privacy](https://amd989.github.io/readout/privacy.html) · [The 121GW](https://www.eevblog.com/product/121gw/)
@@ -40,7 +40,7 @@ Windows. Built with .NET 10 and .NET MAUI.
 - **Reconnects by itself** to the last meter when it comes back in range (can be turned off
   in Settings).
 - **Demo meter.** Try the app without a meter (simulated readings).
-- **Works with Claude (Mac and Windows).** An optional, local-only MCP server lets an AI
+- **Works with Claude (Mac, Windows and Linux).** An optional, local-only MCP server lets an AI
   assistant read the meter, look at recent readings, press buttons and save sessions. See
   [docs/MCP.md](docs/MCP.md).
 
@@ -55,7 +55,7 @@ Windows. Built with .NET 10 and .NET MAUI.
 | macOS (Mac Catalyst) 12+ | ✅ |
 | Android 6+ | ✅ |
 | Windows 10/11 | ✅ builds on Windows |
-| Linux | Planned: `Readout.Core` is plain .NET, ready for a Linux front end (see below) |
+| Linux (GTK 4.12+, BlueZ) | Preview: MAUI's GTK4 backend, see [Linux](#linux) |
 
 ## Repository layout
 
@@ -64,7 +64,9 @@ Windows. Built with .NET 10 and .NET MAUI.
 | `Readout.Core/` | Everything about the meter that isn't UI or a Bluetooth stack: packet parsing, LCD decoding, key commands, logging and CSV, the simulated meter. Plain `net10.0`. |
 | `Readout.Mcp/` | The MCP server for AI assistants: the tools and a small loopback HTTP host, on the official MCP C# SDK. Plain `net10.0`. |
 | `Readout/` | The .NET MAUI app: Bluetooth through Plugin.BLE, view models, pages, the LCD and graph drawings. |
-| `Readout.Tests/` | xUnit tests for the core. |
+| `Readout.Linux/` | The Linux build of the same app, on MAUI's GTK4 backend, with Bluetooth through BlueZ. |
+| `Readout.Tests/` | xUnit tests for the core, the MCP server and the BlueZ helpers. |
+| `tools/linux-test/` | Runs the Linux build in Docker, with the simulated meter or a stand-in for BlueZ. |
 | `docs/PROTOCOL.md` | The 121GW Bluetooth protocol, documented. |
 | `docs/` | Also the GitHub Pages site (`index.html`, `privacy.html`, `support.html`) and the web screenshots. |
 | `store/` | Full-size App Store screenshots. |
@@ -90,7 +92,12 @@ dotnet build Readout -f net10.0-maccatalyst
 dotnet build Readout -f net10.0-android
 ```
 
-On Windows, `-f net10.0-windows10.0.19041.0`.
+On Windows, `-f net10.0-windows10.0.19041.0`. The Linux build is a separate project that
+builds anywhere, without the MAUI workload:
+
+```bash
+dotnet build Readout.Linux
+```
 
 Simulators and emulators have no Bluetooth. Debug builds running on one use the simulated
 meter when you scan (set `READOUT_FAKE_BLE=1` to do that anywhere). Every build also has
@@ -107,14 +114,37 @@ and arm64 in `artifacts/windows` (the Store signs them). Release Windows builds 
 builds stay a plain `.exe`. `-Test -Install` builds and installs a local test copy (Developer
 Mode), and `-Wack` also runs the Windows App Certification Kit from an administrator shell.
 
+`./publish-linux.sh x64 arm64` builds self-contained Linux tarballs
+(`Readout.Linux/bin/publish/Readout-linux-<arch>.tar.gz`); it runs on macOS and Windows too.
+
 <img src="docs/screenshots/mac-meter.png" width="820" alt="The Mac app with the meter and a wide graph">
 
 ## Linux
 
-.NET MAUI has no Linux support today. Everything that knows about the meter lives in
-`Readout.Core`, which has no MAUI or Bluetooth dependency: a Linux app needs a UI and an
-`IMeterConnection` over BlueZ. Avalonia's MAUI backend may make the existing app run on Linux
-directly once it is stable.
+`Readout.Linux` runs the same app on Linux, on Microsoft's GTK4 backend for .NET MAUI
+([dotnet/maui-labs](https://github.com/dotnet/maui-labs/tree/main/platforms/Linux.Gtk4), a
+preview). It compiles the app's own pages and code; only the Bluetooth connection and a few
+fixes for gaps in the preview backend are Linux's own. Bluetooth goes through BlueZ over
+D-Bus. The MCP server for AI assistants works there too.
+
+To run it, unpack a tarball from `./publish-linux.sh` and start `readout/Readout`. It's
+self-contained (no .NET install); the machine needs GTK 4.12 or later (`libgtk-4-1`) and, for
+the meter, BlueZ running with a powered Bluetooth LE adapter. BlueZ's default policy lets any
+local user scan and connect, so nothing needs root. `READOUT_FAKE_BLE=1` uses the simulated
+meter, and **Try the demo meter** works as everywhere else.
+
+What's different on Linux:
+
+- Tabs sit at the top, and pages pushed on top of a tab get a back button in the title bar.
+- Graphs zoom with the mouse wheel (or a touchpad), pan by dragging, and reset on a double-click.
+- Export CSV opens a save dialog instead of a share sheet.
+- BlueZ reports a meter's signal strength only while scanning, so once connected the signal
+  bars show the strength from the scan and hide after 30 seconds without a new one.
+- No continuity beep or vibration yet (as on Windows). Alert boxes show no title.
+
+`tools/linux-test/` runs it in Docker (Ubuntu 24.04) with the simulated meter, or against
+`mock-bluez.py`, a stand-in for BlueZ that plays a 121GW. It hasn't been tried with a real
+meter on Linux yet.
 
 ## Credits
 

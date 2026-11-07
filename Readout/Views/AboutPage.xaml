@@ -44,6 +44,8 @@
                        Text="The meter protocol is based on the official EEVblog 121GW app by David Ledger, Copyright (c) 2018 David Ledger, used under the MIT License." />
                 <Label Style="{StaticResource SecondaryText}"
                        Text="Built with .NET MAUI (MIT, .NET Foundation), Plugin.BLE (MIT), and the CommunityToolkit.Mvvm (MIT, .NET Foundation). Open Sans font under the SIL Open Font License 1.1." />
+                <Label x:Name="LinuxCredits" IsVisible="False" Style="{StaticResource SecondaryText}"
+                       Text="On Linux: the GTK4 backend for .NET MAUI (MIT, Microsoft), GirCore (MIT) and Tmds.DBus (MIT)." />
             </VerticalStackLayout>
 
             <VerticalStackLayout Spacing="6">

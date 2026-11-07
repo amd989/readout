@@ -12,7 +12,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly AppSettings _settings;
     private readonly MeterSession _session;
 
-#if MACCATALYST || WINDOWS
+#if MACCATALYST || WINDOWS || LINUX
     private readonly McpHost _mcp;
 
     public SettingsViewModel(AppSettings settings, MeterSession session, McpHost mcp)
@@ -66,7 +66,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public string Version { get; } = AppVersion.Text;
 
-    public bool ShowVibration => AppSettings.CanVibrate;
+    public bool ShowVibration { get; } = AppSettings.CanVibrate;
 
     public string ContinuityHelp { get; } = AppSettings.CanVibrate
         ? "In continuity and resistance modes, the phone beeps and buzzes below the first value and stops above the second, so a wavering reading doesn't chatter."
@@ -100,8 +100,12 @@ public sealed partial class SettingsViewModel : ObservableObject
     private static bool TryOhms(string text, out double ohms) =>
         double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out ohms) && ohms is >= 0 and <= 10_000;
 
-    /// <summary>The AI assistant (MCP) section: Mac and Windows only.</summary>
+    /// <summary>The AI assistant (MCP) section: desktops only (Mac, Windows, Linux).</summary>
+#if LINUX
+    public bool ShowMcp { get; } = true;
+#else
     public bool ShowMcp { get; } = DeviceInfo.Idiom == DeviceIdiom.Desktop;
+#endif
 
     [ObservableProperty] private bool _mcpEnabled;
     [ObservableProperty] private string _mcpPort;
@@ -130,7 +134,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822", Justification = "Uses the settings on desktop; does nothing on phones, where the section is hidden.")]
     private async Task CopyMcpSetupAsync()
     {
-#if MACCATALYST || WINDOWS
+#if MACCATALYST || WINDOWS || LINUX
         var choices = new (string Title, Readout.Mcp.McpClientKind Kind, string Where)[]
         {
             ("Claude Code", Readout.Mcp.McpClientKind.ClaudeCode,
