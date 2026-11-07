@@ -177,10 +177,18 @@ static void startBluetooth() {
 
   service->start();
 
+  // The name goes in the advertisement itself: apps find bridges by it, and some scanners
+  // (BlueZ on Linux) don't always pick up a scan response. The 128-bit service UUID doesn't fit
+  // beside it, so it goes in the scan response. "BR/EDR not supported" tells BlueZ to use LE.
+  NimBLEAdvertisementData advertisement;
+  advertisement.setFlags(BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP);
+  advertisement.setName(name.c_str());
+  NimBLEAdvertisementData scanResponse;
+  scanResponse.setCompleteServices(NimBLEUUID(SERVICE_UUID));
+
   NimBLEAdvertising *advertising = NimBLEDevice::getAdvertising();
-  advertising->addServiceUUID(SERVICE_UUID);
-  // The 128-bit UUID fills most of the advertisement; the name goes in the scan response.
-  advertising->setScanResponse(true);
+  advertising->setAdvertisementData(advertisement);
+  advertising->setScanResponseData(scanResponse);
   advertising->start();
 
   Serial.printf("advertising as \"%s\"\n", name.c_str());
