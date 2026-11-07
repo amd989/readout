@@ -114,6 +114,12 @@ internal sealed class BlueZBus(ILogger<BlueZBus> logger) : IDisposable
         writer.WriteDictionaryEntryStart();
         writer.WriteString("DuplicateData");
         writer.WriteVariantBool(true);
+        // Any RSSI threshold (this one lets everything through) makes BlueZ signal the RSSI of
+        // every advertisement; without one it signals only changes of 8 dBm or more, so a meter
+        // lying still went quiet and the session took it for switched off.
+        writer.WriteDictionaryEntryStart();
+        writer.WriteString("RSSI");
+        writer.WriteVariantInt16(-127);
         writer.WriteDictionaryEnd(dict);
         return connection.CallMethodAsync(writer.CreateMessage());
     }
