@@ -20,11 +20,22 @@ public static class Format
         _ => $"{(int)span.TotalHours} h {span.Minutes} min",
     };
 
-    /// <summary>A name that's safe in a file name: "DC voltage Oct 27" → "DC-voltage-Oct-27".</summary>
+    /// <summary>
+    /// A name that's safe in a file name on any system the CSV may end up on:
+    /// "AC voltage, Nov 4 15:56" → "AC-voltage-Nov-4-15-56". Letters, digits, "_" and "." stay;
+    /// anything else (spaces, ":" which Windows refuses, ",") becomes one "-".
+    /// </summary>
     public static string FileName(string name)
     {
-        var invalid = Path.GetInvalidFileNameChars();
-        var cleaned = new string([.. name.Select(c => invalid.Contains(c) || char.IsWhiteSpace(c) ? '-' : c)]);
-        return string.IsNullOrWhiteSpace(cleaned.Trim('-')) ? "session" : cleaned.Trim('-');
+        var cleaned = new System.Text.StringBuilder();
+        foreach (var c in name)
+        {
+            if (char.IsLetterOrDigit(c) || c is '_' or '.')
+                cleaned.Append(c);
+            else if (cleaned.Length > 0 && cleaned[^1] != '-')
+                cleaned.Append('-');
+        }
+        var result = cleaned.ToString().Trim('-', '.');
+        return result.Length == 0 ? "session" : result;
     }
 }

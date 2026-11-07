@@ -52,7 +52,7 @@ public sealed partial class SessionDetailViewModel(SessionStore store, ILogger<S
             GraphSamples = [.. samples.Where(s => s.Mode == _info.MainMode)];
             var others = samples.Count - GraphSamples.Count;
             OtherModesNote = others > 0
-                ? $"The graph shows the {_info.ModeName.ToLowerInvariant()} readings. {others:N0} readings in other modes are in the CSV."
+                ? $"The graph shows the {InSentence(_info.ModeName)} readings. {others:N0} readings in other modes are in the CSV."
                 : "";
             SamplesLoaded?.Invoke(this, EventArgs.Empty);
         }
@@ -128,4 +128,10 @@ public sealed partial class SessionDetailViewModel(SessionStore store, ILogger<S
         _info = null;
         await Shell.Current.GoToAsync("..");
     }
+
+    /// <summary>A mode name inside a sentence: "Resistance" → "resistance", but "AC voltage" keeps its AC.</summary>
+    private static string InSentence(string modeName) =>
+        modeName.Length > 1 && char.IsUpper(modeName[0]) && !char.IsUpper(modeName[1])
+            ? char.ToLowerInvariant(modeName[0]) + modeName[1..]
+            : modeName;
 }

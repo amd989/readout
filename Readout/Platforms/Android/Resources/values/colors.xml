@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#D9731A</color>
-    <color name="colorPrimaryDark">#9E5212</color>
+    <!-- The bar behind a page's title (and the status bar above it) takes colorPrimary, so it
+         matches Shell's title bar (BrandShell in Styles.xaml): white here, dark in values-night.
+         Orange made a band above the white title bar. -->
+    <color name="colorPrimary">#FFFFFF</color>
+    <color name="colorPrimaryDark">#FFFFFF</color>
     <color name="colorAccent">#9E5212</color>
 </resources>

@@ -1,16 +1,26 @@
-# Unit tests on every push and pull request. Readout.Core and its tests are plain net10.0,
-# so they need no MAUI workload and run on Linux.
+# Unit tests on every push and pull request, and before each release (release.yml calls it).
+# Readout.Core and its tests are plain net10.0, so they need no MAUI workload and run on Linux.
 name: CI
 
 on:
   push:
+    # Branches only: a tag push runs release.yml, which runs these tests itself.
+    branches: ['**']
   pull_request:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Commit or tag to test. Empty: the one that triggered the run."
+        type: string
+        required: false
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: actions/setup-dotnet@v4
         with:

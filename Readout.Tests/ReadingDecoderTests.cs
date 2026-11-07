@@ -118,6 +118,22 @@ public class ReadingDecoderTests
         Assert.Equal("OFL MΩ", r.MainLine);
     }
 
+    [Theory]
+    [InlineData(2)]
+    [InlineData(25)]
+    [InlineData(0)]
+    public void Decode_Overload_ShowsTheWholeBar(int barValue)
+    {
+        // A real 121GW on Ω with the leads open: its LCD shows the whole bar, while the
+        // packets' bar value flips between 2 and 25 (and sometimes 0).
+        var r = Decode(new PacketBuilder
+        {
+            Mode = MeterMode.Resistance, MainRangeIndex = 6, MainOverload = true, AutoRange = true,
+            BarScale = BarScale.Fifty, BarValue = barValue,
+        });
+        Assert.Equal(BarGraph.TotalSegments, r.Bar.Segments);
+    }
+
     [Fact]
     public void Decode_RangeTheTableDoesNotKnow_ShowsDigitsWithoutAValue()
     {

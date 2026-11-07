@@ -6,6 +6,13 @@ Windows. Built with .NET 10 and .NET MAUI.
 **[Website](https://amd989.github.io/readout/)** · [Support](https://amd989.github.io/readout/support.html) ·
 [Privacy](https://amd989.github.io/readout/privacy.html) · [The 121GW](https://www.eevblog.com/product/121gw/)
 
+<a href="https://apps.microsoft.com/detail/9P80492G34GN">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/ms-store-badge-light.svg">
+    <img src="docs/ms-store-badge-dark.svg" width="161" height="44" alt="Get it from Microsoft">
+  </picture>
+</a>
+
 <p>
   <img src="docs/screenshots/iphone-meter.png" width="200" alt="Live DC voltage reading with a graph">
   <img src="docs/screenshots/iphone-ac-dark.png" width="200" alt="AC voltage and frequency in dark mode">

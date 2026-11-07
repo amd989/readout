@@ -74,9 +74,11 @@ public static class ReadingDecoder
             BaseValue = baseValue,
             BaseUnit = info?.BaseUnit ?? "",
             Sub = DecodeSub(packet, previousSubLabel),
+            // On OFL the meter's LCD shows the whole bar, whatever the packet's bar value says
+            // (on Ω it flips between 2 and 25).
             Bar = new BarGraph(
                 packet.BarOn,
-                packet.BarOn ? Math.Min(BarGraph.TotalSegments, packet.BarValue + 1) : 0,
+                !packet.BarOn ? 0 : packet.MainOverload ? BarGraph.TotalSegments : Math.Min(BarGraph.TotalSegments, packet.BarValue + 1),
                 packet.BarNegative,
                 packet.BarScale,
                 packet.BarTicks150),

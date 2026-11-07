@@ -149,6 +149,13 @@ MODE step, range and SETUP page:
   two seconds on temperature), but its packets say 0 with the overload bit clear. Nothing in
   the packet marks it; the app treats a 0 within 2.5 s of a mode change as blank. Temperature
   with no thermocouple then sends OFL as it should.
+- Autoranging does the same at each range step (Ω stepping up to OFL when a resistor comes
+  off, about two steps a second): the display is blank, the packets say 0 with a bar value
+  that jumps (23, 0, 8…). The app treats a 0 within 2.5 s of a range change with AUTO lit as
+  blank too, with no bar. Not after a manual RANGE press, where 0 can be a reading.
+- On OFL the LCD lights the whole bar, but the bar value doesn't say so: on Ω with the
+  leads open it is mostly 2, with single packets of 25, 18 or 0. The app draws the whole bar
+  on any OFL.
 
 ### Setting the clock
 

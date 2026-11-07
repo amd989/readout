@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark mode: OffBlack, Shell's dark title bar (see values/colors.xml). -->
+    <color name="colorPrimary">#1F1F1F</color>
+    <color name="colorPrimaryDark">#1F1F1F</color>
+</resources>

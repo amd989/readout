@@ -40,7 +40,9 @@ nav .links a:hover { color: var(--text); }
 .hero p.lead { font-size: 20px; color: var(--muted); margin: 0 0 26px; }
 .hero .phone { justify-self: center; width: min(330px, 80vw); }
 .hero .mockup { width: min(270px, 66vw); }
-.cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.store-badge { display: block; line-height: 0; }
+.store-badge img { height: 48px; width: auto; }
 .button { display: inline-block; padding: 12px 20px; border-radius: 12px; text-decoration: none; font-weight: 600; }
 .button.primary { background: var(--accent-strong); color: #fff; }
 .button.secondary { border: 1px solid var(--line); color: var(--text); }

@@ -40,14 +40,20 @@ public sealed class Eevblog121GwDriver : IMeterDriver
         var pressed = last is not null ? KeyInference.Infer(last, packet) : null;
 
         // After a mode change the meter's display stays blank until it has measured, but its
-        // packets say 0 (a real meter, on temperature, for about two seconds).
+        // packets say 0 (a real meter, on temperature, for about two seconds). The same after
+        // each range step while autoranging (on Ω, stepping up to OFL), with a bar that jumps.
         if (last is not null && (last.Mode != packet.Mode ||
-            (last.Coupling == Coupling.AcPlusDc) != (packet.Coupling == Coupling.AcPlusDc)))
+            (last.Coupling == Coupling.AcPlusDc) != (packet.Coupling == Coupling.AcPlusDc) ||
+            (packet.AutoRange && last.MainRangeIndex != packet.MainRangeIndex)))
             _modeChangedAt = now;
         if (_modeChangedAt is { } changed)
         {
             if (!packet.MainOverload && packet.MainRawValue == 0 && now - changed < BlankAfterModeChange)
-                reading = reading with { Blank = true, MainText = "", MainNegative = false, MainUnit = "", Value = null, BaseValue = null };
+                reading = reading with
+                {
+                    Blank = true, MainText = "", MainNegative = false, MainUnit = "", Value = null, BaseValue = null,
+                    Bar = reading.Bar with { Segments = 0 },
+                };
             else
                 _modeChangedAt = null;
         }
