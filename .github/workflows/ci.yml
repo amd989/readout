@@ -1,5 +1,6 @@
-# Unit tests on every push and pull request, and before each release (release.yml calls it).
-# Readout.Core and its tests are plain net10.0, so they need no MAUI workload and run on Linux.
+# Unit tests on every push and pull request, and before each release (release.yml calls it),
+# plus the Linux app's build. Readout.Core, its tests and the Linux head are plain net10.0, so
+# they need no MAUI workload and run on Linux.
 name: CI
 
 on:
@@ -33,3 +34,7 @@ jobs:
 
       - name: Test
         run: dotnet test --project Readout.Tests --configuration Release --no-build
+
+      # The Linux head is plain net10.0 on MAUI's GTK4 backend, so it builds here too.
+      - name: Build Linux app
+        run: dotnet build Readout.Linux --configuration Release

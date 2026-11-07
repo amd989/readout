@@ -21,6 +21,9 @@
 
 	<ItemGroup>
 		<None Update="TestData\**" CopyToOutputDirectory="PreserveNewest" />
+		<!-- The Linux head's BlueZ names and choices, which need no D-Bus or GTK. -->
+		<Compile Include="..\Readout.Linux\BlueZ\BlueZNames.cs" Link="Linux\BlueZNames.cs" />
+		<Compile Include="..\Readout.Linux\BlueZ\RecentRssi.cs" Link="Linux\RecentRssi.cs" />
 	</ItemGroup>
 
 	<ItemGroup>

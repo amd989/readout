@@ -39,7 +39,10 @@ SOFTWARE.
 | .NET MAUI (Microsoft.Maui.Controls) | MIT, .NET Foundation |
 | Plugin.BLE | MIT |
 | CommunityToolkit.Mvvm | MIT, .NET Foundation |
-| ModelContextProtocol.Core (Mac and Windows) | Apache 2.0, © Model Context Protocol a Series of LF Projects, LLC. <https://csharp.sdk.modelcontextprotocol.io/> |
+| ModelContextProtocol.Core (Mac, Windows and Linux) | Apache 2.0, © Model Context Protocol a Series of LF Projects, LLC. <https://csharp.sdk.modelcontextprotocol.io/> |
+| Microsoft.Maui.Platforms.Linux.Gtk4 and .Essentials (Linux) | MIT, © Microsoft Corporation |
+| GirCore (GTK bindings, Linux) | MIT |
+| Tmds.DBus.Protocol (BlueZ, Linux) | MIT, © Tom Deseyn |
 | xunit.v3 (tests only) | Apache 2.0 |
 
 ## Fonts
