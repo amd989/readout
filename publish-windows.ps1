@@ -14,8 +14,12 @@ the last part (the Store requires it): 1.0 and build 26301 give 1.0.26301.0. Eac
 a higher version than the last.
 
 .PARAMETER Build
-Build number, 1 to 65535. Defaults to the date as yyDDD (26301 for 28 October 2026); pass a
+Build number, 0 to 65535. Defaults to the date as yyDDD (26301 for 28 October 2026); pass a
 higher one for a second upload on the same day.
+
+.PARAMETER Display
+major.minor to use instead of ApplicationDisplayVersion. The release workflow passes the tag's
+major.minor here and its patch number as -Build, so v1.2.3 gives 1.2.3.0.
 
 .PARAMETER Test
 Allow the placeholder identity. The packages work for local testing but can't be uploaded.
@@ -33,8 +37,9 @@ package's publisher, trusts that certificate on this PC, and installs the copy.
 ./publish-windows.ps1 -Test -Install
 #>
 param(
-    [ValidateRange(1, 65535)]
+    [ValidateRange(0, 65535)]
     [int]$Build = [int]((Get-Date).ToString('yy')) * 1000 + (Get-Date).DayOfYear,
+    [string]$Display,
     [switch]$Test,
     [switch]$Install,
     [switch]$Wack
@@ -57,10 +62,12 @@ if (($Identity.Name -like 'PARTNER-CENTER-*' -or $Identity.Publisher -like '*PAR
 }
 
 # ApplicationDisplayVersion is major.minor; the build number goes third.
-[xml]$Csproj = Get-Content (Join-Path $Proj 'Readout.csproj')
-$Display = @($Csproj.Project.PropertyGroup.ApplicationDisplayVersion | Where-Object { $_ })[0]
+if (-not $Display) {
+    [xml]$Csproj = Get-Content (Join-Path $Proj 'Readout.csproj')
+    $Display = @($Csproj.Project.PropertyGroup.ApplicationDisplayVersion | Where-Object { $_ })[0]
+}
 if ($Display -notmatch '^\d+\.\d+$') {
-    Write-Error "Expected ApplicationDisplayVersion as major.minor (like 1.0), got '$Display'."
+    Write-Error "Expected the display version as major.minor (like 1.0), got '$Display'."
 }
 $Version = "$Display.$Build.0"
 

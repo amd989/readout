@@ -487,3 +487,11 @@ Directory.Build.local.props
 
 # Store listing and checklist (kept local)
 store/*.md
+
+# Signing material (release.yml takes these from GitHub secrets)
+*.keystore
+*.jks
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile

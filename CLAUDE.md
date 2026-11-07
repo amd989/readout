@@ -31,6 +31,8 @@ dotnet build Readout -f net10.0-android
 ./publish-ios.sh       # Release .ipa for TestFlight / App Store (fails on any non-arm64 slice)
 ./publish-mac.sh       # Release .pkg for the Mac App Store (universal, sandboxed)
 ./publish-windows.ps1  # Release .msix (x64 + arm64) for the Microsoft Store; -Test -Install for a local copy
+./publish-android.sh   # signed Release .aab for Google Play + .apk (needs the ANDROID_* keystore variables)
+git tag v1.2.0 && git push origin v1.2.0   # release.yml: every store + a GitHub release (docs/STORE-CI.md)
 ```
 
 ## Things to know

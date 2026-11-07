@@ -12,6 +12,10 @@ PROFILE="${PROFILE:-Readout App Store}"
 # Each upload needs a higher build number than the last: the date and time (261022.1702),
 # or ./publish-ios.sh <number>. The 10# drops a leading zero from the time.
 BUILD="${1:-$(date +%y%m%d).$((10#$(date +%H%M)))}"
+# DISPLAY_VERSION (like 1.2.3) overrides ApplicationDisplayVersion; the release workflow
+# sets it from the git tag.
+EXTRA=()
+if [ -n "$DISPLAY_VERSION" ]; then EXTRA+=("/p:ApplicationDisplayVersion=$DISPLAY_VERSION"); fi
 KEY="$(security find-identity -v -p codesigning | grep -o '"Apple Distribution: [^"]*"' | head -1 | tr -d '"')"
 
 if [ -z "$KEY" ]; then
@@ -25,7 +29,8 @@ dotnet publish "$PROJ" -f net10.0-ios -c Release \
   /p:ArchiveOnBuild=true \
   /p:CodesignKey="$KEY" \
   /p:CodesignProvision="$PROFILE" \
-  /p:ApplicationVersion="$BUILD"
+  /p:ApplicationVersion="$BUILD" \
+  "${EXTRA[@]}"
 
 IPA="$(ls -t "$OUT"/*.ipa | head -1)"
 

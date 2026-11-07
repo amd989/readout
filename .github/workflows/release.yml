@@ -1,0 +1,438 @@
+# Releases from a git tag. Push vX.Y.Z (or vX.Y.Z-beta.1 for a prerelease) and this:
+#   1. runs the tests,
+#   2. builds the Microsoft Store bundle, the Google Play .aab (plus an .apk), the iPhone/iPad
+#      .ipa and the Mac .pkg, with the version taken from the tag,
+#   3. publishes a GitHub release with notes from the conventional commit messages and the .apk,
+#   4. sends the packages to each store. Each store job waits in its environment
+#      (microsoft-store, google-play, app-store) until a reviewer approves it.
+# Setup, secrets and version numbers: docs/STORE-CI.md.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, like v1.2.0"
+        required: true
+      windows:
+        description: "Microsoft Store"
+        type: boolean
+        default: true
+      android:
+        description: "Google Play"
+        type: boolean
+        default: true
+      apple:
+        description: "App Store (iPhone, iPad and Mac)"
+        type: boolean
+        default: true
+      github:
+        description: "GitHub release"
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
+      major_minor: ${{ steps.tag.outputs.major_minor }}
+      patch: ${{ steps.tag.outputs.patch }}
+      prerelease: ${{ steps.tag.outputs.prerelease }}
+      version_code: ${{ steps.tag.outputs.version_code }}
+      submit: ${{ steps.tag.outputs.submit }}
+      windows: ${{ steps.tag.outputs.windows }}
+      android: ${{ steps.tag.outputs.android }}
+      apple: ${{ steps.tag.outputs.apple }}
+      github: ${{ steps.tag.outputs.github }}
+    steps:
+      - name: Read the tag
+        id: tag
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+          WINDOWS: ${{ github.event_name == 'push' || inputs.windows }}
+          ANDROID: ${{ github.event_name == 'push' || inputs.android }}
+          APPLE: ${{ github.event_name == 'push' || inputs.apple }}
+          RELEASE: ${{ github.event_name == 'push' || inputs.github }}
+          AUTO_SUBMIT: ${{ vars.STORE_AUTO_SUBMIT }}
+        run: |
+          if [[ ! "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tags look like v1.2.3 or v1.2.3-beta.1, not $TAG."
+            exit 1
+          fi
+          major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} patch=${BASH_REMATCH[3]}
+          if (( patch > 65535 )); then
+            echo "::error::The patch number goes into the Windows version, which allows up to 65535."
+            exit 1
+          fi
+
+          prerelease=false
+          if [ -n "${BASH_REMATCH[4]}" ]; then prerelease=true; fi
+          # The Microsoft Store has no beta channel here, and a prerelease would take the
+          # final release's version (v1.2.0-beta.1 and v1.2.0 are both 1.2.0.0).
+          if [ "$prerelease" = true ]; then WINDOWS=false; fi
+          # Off: drafts to review and send from each store's console. Never for prereleases.
+          submit=false
+          if [ "$AUTO_SUBMIT" = true ] && [ "$prerelease" = false ]; then submit=true; fi
+
+          {
+            echo "tag=$TAG"
+            echo "version=$major.$minor.$patch"
+            echo "major_minor=$major.$minor"
+            echo "patch=$patch"
+            echo "prerelease=$prerelease"
+            # Google Play's versionCode must grow with each upload: the UTC date and time.
+            echo "version_code=$(date -u +%y%j%H%M)"
+            echo "submit=$submit"
+            echo "windows=$WINDOWS"
+            echo "android=$ANDROID"
+            echo "apple=$APPLE"
+            echo "github=$RELEASE"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  test:
+    needs: version
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.version.outputs.tag }}
+
+  # ---------------------------------------------------------------- builds
+
+  windows:
+    needs: [version, test]
+    if: needs.version.outputs.windows == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install the MAUI workload
+        run: dotnet workload install maui
+
+      # v1.2.3 gives 1.2.3.0.
+      - name: Build the packages
+        shell: pwsh
+        run: ./publish-windows.ps1 -Display '${{ needs.version.outputs.major_minor }}' -Build ${{ needs.version.outputs.patch }}
+
+      # One bundle with both architectures, so a single upload carries both.
+      - name: Bundle x64 and arm64
+        shell: pwsh
+        run: |
+          $sdk = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.*\x64\makeappx.exe" |
+              Sort-Object FullName -Descending | Select-Object -First 1
+          $in = New-Item -ItemType Directory -Force artifacts/bundle-in
+          Copy-Item artifacts/windows/Readout_*.msix $in
+          $version = (Get-ChildItem $in -Filter 'Readout_*_x64.msix').Name -replace '^Readout_(.+)_x64\.msix$', '$1'
+          & $sdk.FullName bundle /d $in /p "artifacts/windows/Readout_$version.msixbundle" /bv $version /o
+          if ($LASTEXITCODE -ne 0) { throw "makeappx failed" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-store
+          path: |
+            artifacts/windows/*.msix
+            artifacts/windows/*.msixbundle
+
+  android:
+    needs: [version, test]
+    # Also built for the GitHub release, which carries the .apk.
+    if: needs.version.outputs.android == 'true' || needs.version.outputs.github == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: 17
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install the MAUI workload
+        run: dotnet workload install maui-android
+
+      - name: Install the Android SDK packages the app needs
+        run: >
+          dotnet build Readout -f net10.0-android -t:InstallAndroidDependencies
+          -p:AndroidSdkDirectory="$ANDROID_HOME" -p:AcceptAndroidSDKLicenses=True
+
+      - name: Build the .aab and .apk
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          DISPLAY_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          export ANDROID_KEYSTORE="$RUNNER_TEMP/upload.keystore"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE"
+          ./publish-android.sh ${{ needs.version.outputs.version_code }}
+          rm "$ANDROID_KEYSTORE"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: |
+            artifacts/android/*.aab
+            artifacts/android/*.apk
+
+  apple:
+    needs: [version, test]
+    if: needs.version.outputs.apple == 'true'
+    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ios
+            workload: maui-ios
+            script: publish-ios.sh
+            profile_secret: IOS_PROVISIONING_PROFILE
+            profile_ext: mobileprovision
+            output: Readout/bin/Release/net10.0-ios/ios-arm64/publish/*.ipa
+          - platform: mac
+            workload: maui-maccatalyst
+            script: publish-mac.sh
+            profile_secret: MAC_PROVISIONING_PROFILE
+            profile_ext: provisionprofile
+            output: Readout/bin/Release/net10.0-maccatalyst/publish/*.pkg
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install the MAUI workload
+        run: dotnet workload install ${{ matrix.workload }}
+
+      # A throwaway keychain with the Apple Distribution and Mac Installer Distribution
+      # certificates, searched before the login keychain so the publish scripts find them.
+      - name: Import the signing certificates
+        env:
+          CERTIFICATES: ${{ secrets.APPLE_CERTIFICATES_P12 }}
+          CERTIFICATES_PASSWORD: ${{ secrets.APPLE_CERTIFICATES_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(openssl rand -base64 24)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$CERTIFICATES" | base64 --decode > "$RUNNER_TEMP/certificates.p12"
+          security import "$RUNNER_TEMP/certificates.p12" -k "$keychain" -P "$CERTIFICATES_PASSWORD" -f pkcs12 -A
+          rm "$RUNNER_TEMP/certificates.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v
+
+      # The publish scripts pick the profile by name, so pass them the name inside it.
+      - name: Install the provisioning profile
+        env:
+          PROFILE_BASE64: ${{ secrets[matrix.profile_secret] }}
+        run: |
+          profile="$RUNNER_TEMP/profile"
+          printf '%s' "$PROFILE_BASE64" | base64 --decode > "$profile"
+          security cms -D -i "$profile" > "$RUNNER_TEMP/profile.plist"
+          uuid="$(plutil -extract UUID raw -o - "$RUNNER_TEMP/profile.plist")"
+          name="$(plutil -extract Name raw -o - "$RUNNER_TEMP/profile.plist")"
+          for dir in "$HOME/Library/MobileDevice/Provisioning Profiles" \
+                     "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+            mkdir -p "$dir"
+            cp "$profile" "$dir/$uuid.${{ matrix.profile_ext }}"
+          done
+          echo "PROFILE=$name" >> "$GITHUB_ENV"
+          echo "Profile: $name ($uuid)"
+
+      - name: Build
+        env:
+          DISPLAY_VERSION: ${{ needs.version.outputs.version }}
+        run: ./${{ matrix.script }}
+
+      - name: Collect the package
+        run: |
+          mkdir -p artifacts/apple
+          cp ${{ matrix.output }} artifacts/apple/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-store-${{ matrix.platform }}
+          path: artifacts/apple/*
+
+      - name: Remove the keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+
+  # ---------------------------------------------------------------- GitHub release
+
+  github-release:
+    needs: [version, test, windows, android, apple]
+    # Once everything that was asked for has built; skipped builds don't block it.
+    if: >-
+      !cancelled() && needs.version.outputs.github == 'true'
+      && needs.test.result == 'success'
+      && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android
+          path: android
+
+      # Grouped by conventional commit type, since the last release (the last final release
+      # for a final release, so its notes include what went into the betas).
+      - name: Write the release notes
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          if [ "$PRERELEASE" = true ]; then
+            prev="$(git tag --merged "$TAG^" --list 'v*' --sort=-v:refname | head -1)"
+          else
+            prev="$(git tag --merged "$TAG^" --list 'v*' --sort=-v:refname | grep -v -- - | head -1 || true)"
+          fi
+          git log --no-merges --format='%s' "${prev:+$prev..}$TAG" > "$RUNNER_TEMP/subjects"
+
+          section() {
+            local items
+            items="$(grep -E "^($2)(\([^)]*\))?!?: " "$RUNNER_TEMP/subjects" |
+              sed -E 's/^[a-z]+\(([^)]*)\)!?: /- **\1:** /; s/^[a-z]+!?: /- /' || true)"
+            if [ -n "$items" ]; then printf '## %s\n\n%s\n\n' "$1" "$items"; fi
+          }
+          {
+            section "New" "feat"
+            section "Fixes" "fix|perf"
+            section "Other changes" "refactor|revert"
+            if [ -n "$prev" ]; then
+              echo "**Full changelog:** https://github.com/$GITHUB_REPOSITORY/compare/$prev...$TAG"
+            fi
+          } > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          files=(android/*.apk)
+          title="Readout ${TAG#v}"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --title "$title" --notes-file "$RUNNER_TEMP/notes.md" --prerelease="$PRERELEASE"
+            gh release upload "$TAG" "${files[@]}" --clobber
+          else
+            gh release create "$TAG" "${files[@]}" --verify-tag --title "$title" \
+              --notes-file "$RUNNER_TEMP/notes.md" --prerelease="$PRERELEASE"
+          fi
+
+  # ---------------------------------------------------------------- store submissions
+
+  microsoft-store:
+    needs: [version, windows]
+    runs-on: windows-latest
+    environment: microsoft-store
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-store
+          path: packages
+
+      - uses: microsoft/setup-msstore-cli@v1
+
+      - name: Sign in to Partner Center
+        run: >
+          msstore reconfigure
+          --tenantId ${{ secrets.STORE_TENANT_ID }}
+          --sellerId ${{ secrets.STORE_SELLER_ID }}
+          --clientId ${{ secrets.STORE_CLIENT_ID }}
+          --clientSecret ${{ secrets.STORE_CLIENT_SECRET }}
+
+      # Without auto submit: a draft submission to check and send from Partner Center.
+      - name: Upload to the Store
+        shell: pwsh
+        run: |
+          $bundle = Get-ChildItem packages -Filter '*.msixbundle' | Select-Object -First 1
+          $draft = if ('${{ needs.version.outputs.submit }}' -eq 'true') { @() } else { @('--noCommit') }
+          msstore publish $bundle.FullName --appId 9P80492G34GN @draft
+          if ($LASTEXITCODE -ne 0) { throw "msstore publish failed" }
+
+  google-play:
+    needs: [version, android]
+    if: needs.version.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    environment: google-play
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android
+          path: packages
+
+      # Prereleases go to internal testing. Without auto submit, the release is a draft on
+      # its track, to roll out from the Play Console.
+      - uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: md.alejandro.readout
+          releaseFiles: packages/*.aab
+          releaseName: ${{ needs.version.outputs.version }}
+          track: ${{ needs.version.outputs.prerelease == 'true' && 'internal' || vars.PLAY_TRACK || 'internal' }}
+          status: ${{ needs.version.outputs.submit == 'true' && 'completed' || 'draft' }}
+
+  app-store:
+    needs: [version, apple]
+    runs-on: macos-26
+    environment: app-store
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: app-store-*
+          path: packages
+          merge-multiple: true
+
+      # Uploads land in App Store Connect and TestFlight once Apple has processed them; pick
+      # the build for a version there and submit it for review.
+      - name: Upload to App Store Connect
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
+        run: |
+          shopt -s nullglob
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s\n' "$KEY" > ~/.appstoreconnect/private_keys/AuthKey_$KEY_ID.p8
+          for f in packages/*.ipa; do
+            xcrun altool --upload-app --type ios --file "$f" --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+          done
+          for f in packages/*.pkg; do
+            xcrun altool --upload-app --type macos --file "$f" --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+          done

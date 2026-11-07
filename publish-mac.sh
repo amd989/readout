@@ -14,6 +14,10 @@ OUT="$PROJ/bin/Release/net10.0-maccatalyst/publish"
 PROFILE="${PROFILE:-Readout Mac App Store}"
 # Each upload needs a higher build number than the last; see publish-ios.sh.
 BUILD="${1:-$(date +%y%m%d).$((10#$(date +%H%M)))}"
+# DISPLAY_VERSION (like 1.2.3) overrides ApplicationDisplayVersion; the release workflow
+# sets it from the git tag.
+EXTRA=()
+if [ -n "$DISPLAY_VERSION" ]; then EXTRA+=("/p:ApplicationDisplayVersion=$DISPLAY_VERSION"); fi
 KEY="$(security find-identity -v -p codesigning | grep -o '"Apple Distribution: [^"]*"' | head -1 | tr -d '"')"
 INSTALLER="$(security find-identity -v | grep -o '"3rd Party Mac Developer Installer: [^"]*"' | head -1 | tr -d '"')"
 
@@ -37,7 +41,8 @@ dotnet publish "$PROJ" -f net10.0-maccatalyst -c Release \
   /p:CodesignEntitlements=Platforms/MacCatalyst/Entitlements.plist \
   /p:PackageSigningKey="$INSTALLER" \
   /p:UseHardenedRuntime=true \
-  /p:ApplicationVersion="$BUILD"
+  /p:ApplicationVersion="$BUILD" \
+  "${EXTRA[@]}"
 
 PKG="$(ls -t "$OUT"/*.pkg | head -1)"
 
