@@ -1,8 +1,9 @@
 # Releases from a git tag. Push vX.Y.Z (or vX.Y.Z-beta.1 for a prerelease) and this:
 #   1. runs the tests,
 #   2. builds the Microsoft Store bundle, the Google Play .aab (plus an .apk), the iPhone/iPad
-#      .ipa and the Mac .pkg, with the version taken from the tag,
-#   3. publishes a GitHub release with notes from the conventional commit messages and the .apk,
+#      .ipa, the Mac .pkg and the Linux tarballs, with the version taken from the tag,
+#   3. publishes a GitHub release with notes from the commit messages, the .apk and the Linux
+#      tarballs (Linux has no store, so this is where it ships),
 #   4. sends the packages to each store. Each store job waits in its environment
 #      (microsoft-store, google-play, app-store) until a reviewer approves it.
 # Setup, secrets and version numbers: docs/STORE-CI.md.
@@ -194,6 +195,41 @@ jobs:
             artifacts/android/*.aab
             artifacts/android/*.apk
 
+  # Only shipped on the GitHub release. Plain net10.0 on MAUI's GTK4 backend: no workload, and
+  # arm64 cross-publishes from x64.
+  linux:
+    needs: [version, test]
+    if: needs.version.outputs.github == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build the tarballs
+        env:
+          DISPLAY_VERSION: ${{ needs.version.outputs.version }}
+          BUILD_NUMBER: ${{ needs.version.outputs.version_code }}
+        run: ./publish-linux.sh x64 arm64
+
+      - name: Name them after the version
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          mkdir -p artifacts/linux
+          for arch in x64 arm64; do
+            cp "Readout.Linux/bin/publish/Readout-linux-$arch.tar.gz" "artifacts/linux/Readout-$VERSION-linux-$arch.tar.gz"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: artifacts/linux/*.tar.gz
+
   apple:
     needs: [version, test]
     if: needs.version.outputs.apple == 'true'
@@ -289,7 +325,7 @@ jobs:
   # ---------------------------------------------------------------- GitHub release
 
   github-release:
-    needs: [version, test, windows, android, apple]
+    needs: [version, test, windows, android, linux, apple]
     # Once everything that was asked for has built; skipped builds don't block it.
     if: >-
       !cancelled() && needs.version.outputs.github == 'true'
@@ -309,7 +345,13 @@ jobs:
           name: android
           path: android
 
-      # Grouped by conventional commit type, since the last release (the last final release
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux
+          path: linux
+
+      # Grouped by conventional commit type (docs, chore, build, ci, test and style left out),
+      # since the last release (the last final release
       # for a final release, so its notes include what went into the betas).
       - name: Write the release notes
         env:
@@ -323,16 +365,24 @@ jobs:
           fi
           git log --no-merges --format='%s' "${prev:+$prev..}$TAG" > "$RUNNER_TEMP/subjects"
 
+          # "- **scope:** subject" for each commit of these types.
+          typed() {
+            grep -E "^($1)(\([^)]*\))? *!?: " "$RUNNER_TEMP/subjects" |
+              sed -E 's/^[a-z]+\(([^)]*)\) *!?: +/- **\1:** /; s/^[a-z]+ *!?: +/- /' || true
+          }
+          # Commits without a type (a PR merged under its own title) go with the other changes.
+          untyped() {
+            grep -vE '^[a-z]+(\([^)]*\))? *!?: ' "$RUNNER_TEMP/subjects" | sed 's/^/- /' || true
+          }
           section() {
             local items
-            items="$(grep -E "^($2)(\([^)]*\))?!?: " "$RUNNER_TEMP/subjects" |
-              sed -E 's/^[a-z]+\(([^)]*)\)!?: /- **\1:** /; s/^[a-z]+!?: /- /' || true)"
+            items="$(printf '%s\n' "${@:2}" | sed '/^$/d')"
             if [ -n "$items" ]; then printf '## %s\n\n%s\n\n' "$1" "$items"; fi
           }
           {
-            section "New" "feat"
-            section "Fixes" "fix|perf"
-            section "Other changes" "refactor|revert"
+            section "New" "$(typed feat)"
+            section "Fixes" "$(typed 'fix|perf')"
+            section "Other changes" "$(typed 'refactor|revert')" "$(untyped)"
             if [ -n "$prev" ]; then
               echo "**Full changelog:** https://github.com/$GITHUB_REPOSITORY/compare/$prev...$TAG"
             fi
@@ -345,7 +395,7 @@ jobs:
           TAG: ${{ needs.version.outputs.tag }}
           PRERELEASE: ${{ needs.version.outputs.prerelease }}
         run: |
-          files=(android/*.apk)
+          files=(android/*.apk linux/*.tar.gz)
           title="Readout ${TAG#v}"
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release edit "$TAG" --title "$title" --notes-file "$RUNNER_TEMP/notes.md" --prerelease="$PRERELEASE"

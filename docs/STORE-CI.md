@@ -5,9 +5,11 @@
 1. runs the tests (`ci.yml`);
 2. builds every store package with the version from the tag, using the same scripts as a
    local release: `publish-windows.ps1` (x64 + arm64 bundle), `publish-android.sh` (.aab and
-   .apk), `publish-ios.sh` (.ipa) and `publish-mac.sh` (.pkg);
-3. publishes a GitHub release with notes built from the conventional commit messages since the
-   last release, and the .apk attached for sideloading;
+   .apk), `publish-ios.sh` (.ipa), `publish-mac.sh` (.pkg) and `publish-linux.sh` (x64 and
+   arm64 tarballs);
+3. publishes a GitHub release with notes built from the commit messages since the last
+   release, with the .apk (for sideloading) and the Linux tarballs attached. Linux has no
+   store, so the GitHub release is where it ships;
 4. sends the packages to the stores, each job waiting for approval in its environment.
 
 Store listing text and screenshots stay in each store's console.
@@ -26,7 +28,7 @@ Then approve the store jobs in the run (Actions > Release > Review deployments).
 | Microsoft Store | Uploads the bundle to Partner Center | Draft submission, sent from Partner Center | Submitted for certification |
 | Google Play | Uploads the .aab to a track (`PLAY_TRACK`, default `internal`) | Draft release, rolled out from the Play Console | Rolled out (`completed`) |
 | App Store | Uploads the .ipa and .pkg to App Store Connect | In TestFlight; submit for review in App Store Connect | Same (review submission stays manual) |
-| GitHub | Creates the release with notes and the .apk | Published | Published |
+| GitHub | Creates the release with notes, the .apk and the Linux tarballs | Published | Published |
 
 `STORE_AUTO_SUBMIT` and `PLAY_TRACK` are repository variables (Settings > Secrets and
 variables > Actions > Variables). Leave `STORE_AUTO_SUBMIT` unset until a few drafts have gone
@@ -133,4 +135,9 @@ SDK needs.
 Nothing to set up: the job uses the workflow's own token. Release notes group commits by type:
 `feat` under New, `fix` and `perf` under Fixes, `refactor` and `revert` under Other changes;
 `docs`, `chore`, `build`, `ci`, `test` and `style` are left out. A scope becomes a bold prefix
-(`fix(android): ...` is "**android:** ...").
+(`fix(android): ...` is "**android:** ..."). Commits without a type, like a PR squash-merged
+under its own title, go under Other changes; give the PR a `feat:` or `fix:` title to put it
+where it belongs.
+
+The Linux tarballs are named `Readout-<version>-linux-<arch>.tar.gz`. Unpack one and run
+`./readout/Readout`; the machine needs GTK 4.12+ and, for the meter, BlueZ.
