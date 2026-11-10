@@ -49,6 +49,10 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
     private string? _devicePath;
     private string? _dataPath;
     private string _writeType = "request";
+    // A two-way bridge's RX characteristic (the DSO150's), where SendAsync writes.
+    private string? _rxPath;
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
+    private const int MaxWriteLength = 512;
 
     public BlueZMeterConnection(BlueZBus bus, ILogger<BlueZMeterConnection> logger)
     {
@@ -231,7 +235,8 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
         while (!await ServicesResolvedAsync(devicePath).ConfigureAwait(false))
             await Task.Delay(100, ct).ConfigureAwait(false);
 
-        var data = BlueZNames.PickDataCharacteristic(await CharacteristicsAsync(devicePath).ConfigureAwait(false))
+        var characteristics = await CharacteristicsAsync(devicePath).ConfigureAwait(false);
+        var data = BlueZNames.PickDataCharacteristic(characteristics)
             ?? throw new InvalidOperationException("This device has no meter data characteristic.");
         if (!BlueZNames.IsKnownDataCharacteristic(data.Uuid))
             _logger.LogWarning("data characteristic not found by UUID, using {Uuid}", data.Uuid);
@@ -240,6 +245,7 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
         {
             _dataPath = data.Path;
             _writeType = BlueZNames.WriteType(data.Flags);
+            _rxPath = BlueZNames.PickRxCharacteristic(characteristics)?.Path;
         }
         await _bus.CallAsync(data.Path, BlueZNames.GattCharacteristic1, "StartNotify").WaitAsync(ct).ConfigureAwait(false);
 
@@ -370,13 +376,37 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
         await _bus.WriteValueAsync(dataPath, MeterCommands.KeyPress(key, longPress), writeType).WaitAsync(ct).ConfigureAwait(false);
     }
 
+    public async Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
+    {
+        string? rxPath;
+        lock (_gate) rxPath = _dataPath is null ? null : _rxPath ?? "";
+        if (rxPath is null || data.IsEmpty) return;
+        if (rxPath.Length == 0) throw new NotSupportedException($"{Meter?.Name ?? "This meter"} takes no data.");
+
+        // In order, one at a time. A write request longer than the MTU allows goes as a long
+        // write, which BlueZ splits up; one attribute holds at most 512 bytes.
+        await _writeGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            for (var offset = 0; offset < data.Length; offset += MaxWriteLength)
+            {
+                var chunk = data.Slice(offset, Math.Min(MaxWriteLength, data.Length - offset)).ToArray();
+                await _bus.WriteValueAsync(rxPath, chunk, "request").WaitAsync(ct).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
     private async Task CloseLinkAsync()
     {
         string? devicePath, dataPath;
         lock (_gate)
         {
             (devicePath, dataPath) = (_devicePath, _dataPath);
-            _devicePath = _dataPath = null;
+            _devicePath = _dataPath = _rxPath = null;
         }
         _rssi.Clear();
 
@@ -461,7 +491,7 @@ internal sealed class BlueZMeterConnection : IMeterConnection, IDisposable
     private void OnLinkDropped()
     {
         _logger.LogWarning("link lost");
-        lock (_gate) _devicePath = _dataPath = null;
+        lock (_gate) _devicePath = _dataPath = _rxPath = null;
         _rssi.Clear();
         Meter = null;
         SetState(ConnectionState.Disconnected);

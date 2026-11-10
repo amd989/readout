@@ -1,4 +1,5 @@
 using Readout.Core.Display;
+using Readout.Core.Dso150;
 using Readout.Core.Fs9721;
 
 namespace Readout.Core.Connection;
@@ -28,7 +29,9 @@ public static class MeterDrivers
 {
     public static IMeterDriver For(MeterModel model) => model switch
     {
+        MeterModel.Eevblog121Gw => new Eevblog121GwDriver(),
         MeterModel.Fs9721 => new Fs9721Driver(),
-        _ => new Eevblog121GwDriver(),
+        MeterModel.Dso150 => new Dso150Driver(),
+        _ => throw new ArgumentOutOfRangeException(nameof(model), model, "No driver for this meter."),
     };
 }

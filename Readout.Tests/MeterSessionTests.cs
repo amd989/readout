@@ -60,6 +60,14 @@ internal sealed class FakeBluetooth : IMeterConnection
         return Task.CompletedTask;
     }
 
+    public List<byte[]> Sent { get; } = [];
+
+    public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
+    {
+        Sent.Add(data.ToArray());
+        return Task.CompletedTask;
+    }
+
     public void Discover(DiscoveredMeter meter) => MeterDiscovered?.Invoke(this, meter);
     public void Send(MeterPacket packet) => Send(packet.Bytes.ToArray());
     public void Send(byte[] bytes) => DataReceived?.Invoke(this, bytes);
@@ -128,6 +136,38 @@ public sealed class MeterSessionTests : IDisposable
         var r = _session.Latest!;
         Assert.Equal((MeterModel.Fs9721, "2.888 V", MeterMode.DcVolts), (r.Model, r.MainLine, r.Mode));
         Assert.Null(r.Packet);
+    }
+
+    private static readonly DiscoveredMeter Scope = new("ee:ff", "Readout DSO150 A1B2", -60, MeterModel.Dso150);
+
+    [Fact]
+    public async Task Dso150_GetsItsOwnDriver_AndNo121GwReadings()
+    {
+        await _session.ConnectAsync(Scope);
+        Assert.Equal(MeterModel.Dso150, _session.Model);
+        Assert.Equal(MeterCapabilities.Dso150, _session.Capabilities);
+
+        // Not even a valid 121GW packet turns into a reading from a DSO150 bridge.
+        _bluetooth.Send("DSOShell,DSO150,1234,0.1\n"u8.ToArray());
+        _bluetooth.Send(new PacketBuilder { MainRangeIndex = 1, MainRawValue = 12345 }.BuildPacket());
+
+        Assert.Null(_session.Latest);
+        Assert.Equal(0, _session.Log.Count);
+    }
+
+    [Fact]
+    public async Task SendAsync_GoesToTheConnectedMeter()
+    {
+        await _session.SendAsync("*IDN?\n"u8.ToArray());
+        Assert.Empty(_bluetooth.Sent);
+
+        await _session.ConnectAsync(Scope);
+        await _session.SendAsync("*IDN?\n"u8.ToArray());
+
+        Assert.Equal("*IDN?\n"u8.ToArray(), Assert.Single(_bluetooth.Sent));
+        // A DSO150 has no keys to press.
+        await _session.SendKeyAsync(MeterKey.Hold);
+        Assert.Empty(_bluetooth.Keys);
     }
 
     [Fact]

@@ -54,6 +54,7 @@ public class BlueZNamesTests
     [InlineData("121GW", MeterModel.Eevblog121Gw)]
     [InlineData("Bluegiga", MeterModel.Eevblog121Gw)]
     [InlineData("Readout FS9721 B1CC", MeterModel.Fs9721)]
+    [InlineData("Readout DSO150 B1CC", MeterModel.Dso150)]
     public void Model_ComesFromTheName(string name, MeterModel model) =>
         Assert.Equal(model, BlueZNames.ModelFromName(name));
 
@@ -68,6 +69,25 @@ public class BlueZNamesTests
 
         Assert.Equal(Device + "/service0010/char0013", picked?.Path);
     }
+
+    [Fact]
+    public void TwoWayBridge_RxCharacteristic_IsFoundByUuid()
+    {
+        GattCharacteristicInfo[] characteristics =
+        [
+            new(Device + "/service0010/char0011", BridgeBluetooth.ServiceUuid.ToString(), BridgeBluetooth.DataCharacteristicUuid.ToString(), ["notify"]),
+            new(Device + "/service0010/char0016", BridgeBluetooth.ServiceUuid.ToString(), BridgeBluetooth.RxCharacteristicUuid.ToString().ToUpperInvariant(), ["write", "write-without-response"]),
+        ];
+
+        Assert.Equal(Device + "/service0010/char0016", BlueZNames.PickRxCharacteristic(characteristics)?.Path);
+        // Data is still the notifying one, not the writable one.
+        Assert.Equal(Device + "/service0010/char0011", BlueZNames.PickDataCharacteristic(characteristics)?.Path);
+    }
+
+    [Fact]
+    public void ReceiveOnlyBridge_HasNoRxCharacteristic() =>
+        Assert.Null(BlueZNames.PickRxCharacteristic(
+            [new(Device + "/service0010/char0013", BridgeBluetooth.ServiceUuid.ToString(), BridgeBluetooth.DataCharacteristicUuid.ToString(), ["notify"])]));
 
     [Fact]
     public void DataCharacteristic_IsFoundByUuid_InAnyCase()
