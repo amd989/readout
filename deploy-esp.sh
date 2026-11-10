@@ -1,15 +1,15 @@
 #!/bin/bash
-# Build the FS9721 bridge firmware and flash it to an ESP32 on USB.
-#   ./deploy-esp.sh                  esp32dev (TXD lights the optocoupler's LED)
-#   ./deploy-esp.sh esp32dev-vdd     another build: esp32dev-vdd, esp32c3, esp32c3-vdd
+# Build the Readout bridge firmware and flash it to an ESP32 on USB.
+#   ./deploy-esp.sh                  fs9721-esp32dev (TXD lights the optocoupler's LED)
+#   ./deploy-esp.sh dso150-esp32c3   another build: fs9721-esp32dev-vdd, fs9721-esp32c3(-vdd), dso150-esp32dev, dso150-esp32c3
 #   ./deploy-esp.sh --log            ...then follow its serial output (Ctrl-C stops)
 #   ./deploy-esp.sh --port /dev/cu.usbserial-0001   when more than one board is plugged in
-# The builds and their wiring are in firmware/fs9721-bridge/README.md.
+# The builds and their wiring are in firmware/readout-bridge/README.md.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-FIRMWARE="$SCRIPT_DIR/firmware/fs9721-bridge"
-ENV=esp32dev
+FIRMWARE="$SCRIPT_DIR/firmware/readout-bridge"
+ENV=fs9721-esp32dev
 PORT=""
 LOG=0
 

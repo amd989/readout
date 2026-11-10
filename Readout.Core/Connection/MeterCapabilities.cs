@@ -15,9 +15,17 @@ public sealed record MeterCapabilities(bool RemoteKeys, bool ClockSync, bool Sub
     /// <summary>An FS9721 through a bridge: it only sends, 3¾ digits, nothing else.</summary>
     public static readonly MeterCapabilities Fs9721 = new(RemoteKeys: false, ClockSync: false, SubDisplay: false, BarGraph: false, Digits: 4);
 
+    /// <summary>
+    /// A DSO150 oscilloscope through a bridge: no buttons to press (it takes commands instead),
+    /// no clock, no LCD extras. Its measurements come from an 8-bit ADC, so 4 digits is plenty.
+    /// </summary>
+    public static readonly MeterCapabilities Dso150 = new(RemoteKeys: false, ClockSync: false, SubDisplay: false, BarGraph: false, Digits: 4);
+
     public static MeterCapabilities For(MeterModel model) => model switch
     {
+        MeterModel.Eevblog121Gw => Eevblog121Gw,
         MeterModel.Fs9721 => Fs9721,
-        _ => Eevblog121Gw,
+        MeterModel.Dso150 => Dso150,
+        _ => throw new ArgumentOutOfRangeException(nameof(model), model, "No capabilities for this meter."),
     };
 }

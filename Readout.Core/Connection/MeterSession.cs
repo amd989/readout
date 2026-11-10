@@ -182,6 +182,10 @@ public sealed class MeterSession
         return Active.SendKeyAsync(key, longPress, ct);
     }
 
+    /// <summary>Sends bytes to the connected meter as they are (a DSO150's commands); see <see cref="IMeterConnection.SendAsync"/>.</summary>
+    public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default) =>
+        Active.State == ConnectionState.Connected ? Active.SendAsync(data, ct) : Task.CompletedTask;
+
     private async Task LeaveDemoAsync()
     {
         if (!IsDemo) return;

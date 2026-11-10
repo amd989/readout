@@ -9,6 +9,11 @@ public enum MeterModel
     Eevblog121Gw,
     /// <summary>A meter built on Fortune's FS9721_LP3 chip, through a DIY Bluetooth bridge.</summary>
     Fs9721,
+    /// <summary>
+    /// A JYE Tech DSO150 pocket oscilloscope running DSOShell, through the two-way bridge. Its
+    /// protocol is text lines and binary waveform blocks (DSOShell's docs/PROTOCOL.md).
+    /// </summary>
+    Dso150,
 }
 
 /// <summary>Everything the meter's LCD shows for one packet or frame, decoded for display and logging.</summary>

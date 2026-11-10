@@ -93,6 +93,10 @@ internal static class BlueZNames
                 !(Guid.TryParse(c.ServiceUuid, out var service) && MeterBluetooth.StandardServices.Contains(service)));
     }
 
+    /// <summary>A two-way bridge's RX characteristic, where commands for its chip go; null on other meters.</summary>
+    public static GattCharacteristicInfo? PickRxCharacteristic(IEnumerable<GattCharacteristicInfo> characteristics) =>
+        characteristics.FirstOrDefault(c => Guid.TryParse(c.Uuid, out var id) && id == BridgeBluetooth.RxCharacteristicUuid);
+
     /// <summary>
     /// WriteValue's "type": a write request (acknowledged) when the characteristic takes one,
     /// else a write command.

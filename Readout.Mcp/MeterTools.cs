@@ -114,7 +114,12 @@ public sealed class MeterTools(
         return McpResultJson.Serialize(new StatusResult(
             session.State.ToString(),
             session.Meter?.Name,
-            session.Model == MeterModel.Fs9721 ? "FS9721" : "121GW",
+            session.Model switch
+            {
+                MeterModel.Fs9721 => "FS9721",
+                MeterModel.Dso150 => "DSO150",
+                _ => "121GW",
+            },
             session.Capabilities.RemoteKeys,
             session.IsDemo,
             rssi,

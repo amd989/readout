@@ -53,6 +53,14 @@ public interface IMeterConnection
 
     Task DisconnectAsync();
 
-    /// <summary>Presses one of the meter's buttons remotely.</summary>
+    /// <summary>Presses one of the meter's buttons remotely (the 121GW).</summary>
     Task SendKeyAsync(MeterKey key, bool longPress = false, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sends bytes to the meter as they are: a two-way bridge writes them to its chip's serial
+    /// input (<see cref="BridgeBluetooth.RxCharacteristicUuid"/>). Does nothing while not
+    /// connected.
+    /// </summary>
+    /// <exception cref="NotSupportedException">The connected meter takes no bytes (a 121GW, an FS9721 bridge).</exception>
+    Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default);
 }
