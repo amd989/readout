@@ -27,6 +27,9 @@ public sealed class SimulatedMeterConnection : IMeterConnection, IDisposable
     /// <summary>A key press reached the simulated meter (for tests).</summary>
     public event EventHandler<MeterKey>? KeySent;
 
+    /// <summary>Bytes sent with <see cref="SendAsync"/> reached the simulated meter (for tests).</summary>
+    public event EventHandler<ReadOnlyMemory<byte>>? DataSent;
+
     public ConnectionState State { get; private set; }
     public DiscoveredMeter? Meter { get; private set; }
 
@@ -80,6 +83,17 @@ public sealed class SimulatedMeterConnection : IMeterConnection, IDisposable
             _meter.Press(key, longPress);
             KeySent?.Invoke(this, key);
         }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// The demo meter takes the bytes and ignores them: it plays a 121GW, which answers only key
+    /// presses. A simulated DSO150 will answer them.
+    /// </summary>
+    public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
+    {
+        if (State == ConnectionState.Connected && !data.IsEmpty)
+            DataSent?.Invoke(this, data.ToArray());
         return Task.CompletedTask;
     }
 

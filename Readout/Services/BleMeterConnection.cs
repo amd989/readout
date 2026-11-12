@@ -24,6 +24,10 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
 {
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
 
+    // An attribute value holds at most 512 bytes; a write with response longer than the MTU
+    // allows goes as a long write, which the platforms split up themselves.
+    private const int MaxWriteLength = 512;
+
     private readonly IBluetoothLE _ble;
     private readonly IAdapter _adapter;
     private readonly ILogger<BleMeterConnection> _logger;
@@ -33,6 +37,8 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
     private CancellationTokenSource? _rssiCts;
     private IDevice? _device;
     private ICharacteristic? _data;
+    private ICharacteristic? _rx;
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
     private bool _disconnecting;
 
     public BleMeterConnection(IBluetoothLE ble, ILogger<BleMeterConnection> logger)
@@ -128,9 +134,19 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
         {
             await _adapter.ConnectToDeviceAsync(device, new ConnectParameters(autoConnect: false, forceBleTransport: true), timeout.Token);
             _device = device;
+            if (meter.Model != MeterModel.Eevblog121Gw)
+                await RequestMtuAsync(device, timeout.Token);
 
             var data = await FindDataCharacteristicAsync(device, timeout.Token)
                 ?? throw new InvalidOperationException("This device has no meter data characteristic.");
+
+            // A two-way bridge (the DSO150's) takes bytes for its chip here.
+            if (meter.Model != MeterModel.Eevblog121Gw)
+            {
+                _rx = await data.Service.GetCharacteristicAsync(BridgeBluetooth.RxCharacteristicUuid, timeout.Token);
+                if (_rx is not null)
+                    _rx.WriteType = CharacteristicWriteType.WithResponse;
+            }
 
             data.ValueUpdated += OnValueUpdated;
             await data.StartUpdatesAsync(timeout.Token);
@@ -138,7 +154,7 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
 
             SignalStrength = device.Rssi;
             SetState(ConnectionState.Connected);
-            _logger.LogInformation("connected, data on {Characteristic}", data.Id);
+            _logger.LogInformation("connected, data on {Characteristic}{Rx}", data.Id, _rx is null ? "" : ", commands on " + _rx.Id);
             StartRssiPolling(device);
         }
         catch (Exception ex)
@@ -148,6 +164,25 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
             Meter = null;
             SetState(ConnectionState.Disconnected);
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Asks for a bigger MTU so a bridge's notifications carry 244 bytes instead of 20 (DSO150
+    /// waveforms are about 1.1 KB). Android needs the request; iOS and Windows negotiate the
+    /// largest they can by themselves, and this only reports what they got.
+    /// </summary>
+    private async Task RequestMtuAsync(IDevice device, CancellationToken ct)
+    {
+        try
+        {
+            var mtu = await device.RequestMtuAsync(BridgeBluetooth.PreferredMtu, ct);
+            _logger.LogInformation("mtu {Mtu} (asked for {Preferred})", mtu, BridgeBluetooth.PreferredMtu);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The link still works at the default 23, only slower.
+            _logger.LogWarning(ex, "mtu request failed");
         }
     }
 
@@ -224,6 +259,29 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
         await _data.WriteAsync(command, ct);
     }
 
+    public async Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
+    {
+        if (State != ConnectionState.Connected || data.IsEmpty) return;
+        var rx = _rx ?? throw new NotSupportedException($"{Meter?.Name ?? "This meter"} takes no data.");
+
+        // One write at a time: Android fails a write started while another is in flight.
+        await _writeGate.WaitAsync(ct);
+        try
+        {
+            for (var offset = 0; offset < data.Length; offset += MaxWriteLength)
+            {
+                var chunk = data.Slice(offset, Math.Min(MaxWriteLength, data.Length - offset)).ToArray();
+                var result = await rx.WriteAsync(chunk, ct);
+                if (result != 0)
+                    throw new InvalidOperationException($"The bridge refused the write (error {result}).");
+            }
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
     // The signal strength isn't pushed; ask for it every few seconds while connected.
     private void StartRssiPolling(IDevice device)
     {
@@ -254,6 +312,7 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
         var data = _data;
         var device = _device;
         _data = null;
+        _rx = null;
         _device = null;
 
         if (data is not null)
@@ -287,8 +346,29 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
         var value = e.Characteristic.Value;
         if (value is null || value.Length == 0) return;
 
+        // Until the DSO150's driver decodes its lines, the log is where they show up.
+        if (Meter?.Model == MeterModel.Dso150 && _logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation("dso150 rx {Text}", Dso150LogText(value));
+
         // Copied: the platform may reuse the buffer, and the session reads it later on the main thread.
         DataReceived?.Invoke(this, value.ToArray());
+    }
+
+    /// <summary>Text as it is, other bytes as \xNN, cut short: waveform blocks are binary.</summary>
+    private static string Dso150LogText(byte[] value)
+    {
+        const int max = 160;
+        var text = new System.Text.StringBuilder();
+        foreach (var b in value.AsSpan(0, Math.Min(value.Length, max)))
+            text.Append(b switch
+            {
+                (byte)'\n' => @"\n",
+                (byte)'\r' => @"\r",
+                >= 0x20 and < 0x7F => ((char)b).ToString(),
+                _ => @"\x" + b.ToString("X2", System.Globalization.CultureInfo.InvariantCulture),
+            });
+        if (value.Length > max) text.Append(System.Globalization.CultureInfo.InvariantCulture, $"... ({value.Length} bytes)");
+        return text.ToString();
     }
 
     private void OnLinkDropped(IDevice device, string? error)
@@ -302,6 +382,7 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
         _rssiCts = null;
         SignalStrength = null;
         _data = null;
+        _rx = null;
         _device = null;
         Meter = null;
         SetState(ConnectionState.Disconnected);
@@ -312,6 +393,7 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
     {
         _scanCts?.Dispose();
         _rssiCts?.Dispose();
+        _writeGate.Dispose();
     }
 
     private void SetState(ConnectionState state)
