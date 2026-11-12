@@ -55,21 +55,7 @@ Windows and Linux. Built with .NET 10 and .NET MAUI.
 | macOS (Mac Catalyst) 12+ | ✅ |
 | Android 6+ | ✅ |
 | Windows 10/11 | ✅ builds on Windows |
-| Linux (GTK 4.12+, BlueZ) | Preview: MAUI's GTK4 backend, see [Linux](#linux) |
-
-## Repository layout
-
-| Path | What |
-|---|---|
-| `Readout.Core/` | Everything about the meter that isn't UI or a Bluetooth stack: packet parsing, LCD decoding, key commands, logging and CSV, the simulated meter. Plain `net10.0`. |
-| `Readout.Mcp/` | The MCP server for AI assistants: the tools and a small loopback HTTP host, on the official MCP C# SDK. Plain `net10.0`. |
-| `Readout/` | The .NET MAUI app: Bluetooth through Plugin.BLE, view models, pages, the LCD and graph drawings. |
-| `Readout.Linux/` | The Linux build of the same app, on MAUI's GTK4 backend, with Bluetooth through BlueZ. |
-| `Readout.Tests/` | xUnit tests for the core, the MCP server and the BlueZ helpers. |
-| `tools/linux-test/` | Runs the Linux build in Docker, with the simulated meter or a stand-in for BlueZ. |
-| `docs/PROTOCOL.md` | The 121GW Bluetooth protocol, documented. |
-| `docs/` | Also the GitHub Pages site (`index.html`, `privacy.html`, `support.html`) and the web screenshots. |
-| `store/` | Full-size App Store screenshots. |
+| Linux (GTK 4.12+, BlueZ) | Preview: MAUI's GTK4 backend, see [Linux](https://github.com/amd989/readout/wiki/Linux) |
 
 ## Building
 
@@ -80,79 +66,25 @@ for Apple targets and the Android SDK for Android.
 dotnet test --project Readout.Tests
 ```
 
-With `--coverlet`, the tests also measure code coverage of `Readout.Core` and `Readout.Mcp` and
-write a Cobertura report to `TestResults/coverage` (settings in `Readout.Tests/testconfig.json`).
-CI does this on every push and shows the numbers in the run's summary.
-
-```bash
-dotnet test --project Readout.Tests --coverlet --results-directory TestResults/coverage
-```
-
-```bash
-dotnet build Readout -f net10.0-ios
-```
-
 ```bash
 dotnet build Readout -f net10.0-maccatalyst
 ```
 
-```bash
-dotnet build Readout -f net10.0-android
-```
+No meter? Every build has **Try the demo meter** on the connect screen.
 
-On Windows, `-f net10.0-windows10.0.19041.0`. The Linux build is a separate project that
-builds anywhere, without the MAUI workload:
+## Documentation
 
-```bash
-dotnet build Readout.Linux
-```
+The [wiki](https://github.com/amd989/readout/wiki) has the rest:
 
-Simulators and emulators have no Bluetooth. Debug builds running on one use the simulated
-meter when you scan (set `READOUT_FAKE_BLE=1` to do that anywhere). Every build also has
-**Try the demo meter** on the connect screen.
+- [Building](https://github.com/amd989/readout/wiki/Building): every platform, code coverage, running on a device.
+- [Publishing](https://github.com/amd989/readout/wiki/Publishing): store packages, Linux tarballs, releasing from a tag.
+- [Linux](https://github.com/amd989/readout/wiki/Linux): running it, what's different there, testing in Docker.
+- [Repository layout](https://github.com/amd989/readout/wiki/Repository-Layout): what each project holds.
 
-## Publishing
-
-`./publish-ios.sh` builds the signed iPhone/iPad `.ipa` and refuses it if any binary carries a
-slice other than arm64, which App Store Connect rejects. `./publish-mac.sh` builds the signed
-Mac App Store `.pkg` (Apple silicon and Intel). Upload with Transporter.
-
-`./publish-windows.ps1` builds the Microsoft Store packages: an unsigned `.msix` each for x64
-and arm64 in `artifacts/windows` (the Store signs them). Release Windows builds are MSIX; Debug
-builds stay a plain `.exe`. `-Test -Install` builds and installs a local test copy (Developer
-Mode), and `-Wack` also runs the Windows App Certification Kit from an administrator shell.
-
-`./publish-linux.sh x64 arm64` builds self-contained Linux tarballs
-(`Readout.Linux/bin/publish/Readout-linux-<arch>.tar.gz`); it runs on macOS and Windows too.
+In this repository: [the 121GW protocol](docs/PROTOCOL.md), [the MCP server](docs/MCP.md),
+[FS9721 meters through an ESP32 bridge](docs/FS9721.md) and [releases from CI](docs/STORE-CI.md).
 
 <img src="docs/screenshots/mac-meter.png" width="820" alt="The Mac app with the meter and a wide graph">
-
-## Linux
-
-`Readout.Linux` runs the same app on Linux, on Microsoft's GTK4 backend for .NET MAUI
-([dotnet/maui-labs](https://github.com/dotnet/maui-labs/tree/main/platforms/Linux.Gtk4), a
-preview). It compiles the app's own pages and code; only the Bluetooth connection and a few
-fixes for gaps in the preview backend are Linux's own. Bluetooth goes through BlueZ over
-D-Bus. The MCP server for AI assistants works there too.
-
-To run it, unpack a tarball from `./publish-linux.sh` and start `readout/Readout`. It's
-self-contained (no .NET install); the machine needs GTK 4.12 or later (`libgtk-4-1`) and, for
-the meter, BlueZ running with a powered Bluetooth LE adapter. BlueZ's default policy lets any
-local user scan and connect, so nothing needs root. `READOUT_FAKE_BLE=1` uses the simulated
-meter, and **Try the demo meter** works as everywhere else.
-
-What's different on Linux:
-
-- Tabs sit at the top, and pages pushed on top of a tab get a back button in the title bar.
-- Graphs zoom with the mouse wheel (or a touchpad), pan by dragging, and reset on a double-click.
-- Export CSV opens a save dialog instead of a share sheet.
-- BlueZ reports a meter's signal strength only while scanning, so once connected the signal
-  bars show the strength from the scan and hide after 30 seconds without a new one.
-- No continuity beep or vibration yet (as on Windows). Alert boxes show no title.
-
-`tools/linux-test/` runs it in Docker (Ubuntu 24.04) with the simulated meter, or against
-`mock-bluez.py`, a stand-in for BlueZ that plays a 121GW. It hasn't been tried with a real
-meter on Linux yet.
 
 ## Credits
 
