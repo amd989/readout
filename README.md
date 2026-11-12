@@ -55,7 +55,29 @@ Windows and Linux. Built with .NET 10 and .NET MAUI.
 | macOS (Mac Catalyst) 12+ | ✅ |
 | Android 6+ | ✅ |
 | Windows 10/11 | ✅ builds on Windows |
-| Linux (GTK 4.12+, BlueZ) | Preview: MAUI's GTK4 backend, see [Linux](https://github.com/amd989/readout/wiki/Linux) |
+| Linux (GTK 4.12+, BlueZ) | Preview: MAUI's GTK4 backend, see [Linux](#linux) |
+
+## Linux
+
+On Debian 13 (trixie) or Fedora, add the package repository, then install Readout:
+
+```bash
+curl -fsSL https://packages.alejandro.md/setup.sh | sudo sh
+```
+
+```bash
+sudo apt install readout
+```
+
+or `sudo dnf install readout` on Fedora. It shows up in the app menu, or run `readout`.
+Debian 12 (bookworm) ships GTK 4.8, too old for the app, so it has no package there.
+
+The Linux build is a **preview** on MAUI's GTK4 backend: alerts have no title, tabs have no
+icons and there's no continuity beep yet. The meter needs BlueZ running with a powered
+Bluetooth LE adapter (`sudo systemctl enable --now bluetooth`); any local user can scan and
+connect, so no group or root is needed. **Try the demo meter** works without either. Tarballs
+for other distributions are on the [releases](https://github.com/amd989/readout/releases);
+more on the [Linux wiki page](https://github.com/amd989/readout/wiki/Linux).
 
 ## Building
 

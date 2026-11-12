@@ -5,12 +5,14 @@
 1. runs the tests (`ci.yml`);
 2. builds every store package with the version from the tag, using the same scripts as a
    local release: `publish-windows.ps1` (x64 + arm64 bundle), `publish-android.sh` (.aab and
-   .apk), `publish-ios.sh` (.ipa), `publish-mac.sh` (.pkg) and `publish-linux.sh` (x64 and
-   arm64 tarballs);
+   .apk), `publish-ios.sh` (.ipa), `publish-mac.sh` (.pkg), and `publish-linux.sh` plus
+   `package-linux.sh` (x64 and arm64 tarballs, .deb and .rpm);
 3. publishes a GitHub release with notes built from the commit messages since the last
-   release, with the .apk (for sideloading) and the Linux tarballs attached. Linux has no
-   store, so the GitHub release is where it ships;
-4. sends the packages to the stores, each job waiting for approval in its environment.
+   release, with the .apk (for sideloading) and the Linux tarballs and packages attached.
+   Linux has no store, so the GitHub release is where it ships;
+4. sends the packages to the stores, each job waiting for approval in its environment;
+5. for a final release, asks `amd989/packages` to publish the .deb and .rpm on
+   packages.alejandro.md.
 
 Store listing text and screenshots stay in each store's console.
 
@@ -28,7 +30,7 @@ Then approve the store jobs in the run (Actions > Release > Review deployments).
 | Microsoft Store | Uploads the bundle to Partner Center | Draft submission, sent from Partner Center | Submitted for certification |
 | Google Play | Uploads the .aab to a track (`PLAY_TRACK`, default `internal`) | Draft release, rolled out from the Play Console | Rolled out (`completed`) |
 | App Store | Uploads the .ipa and .pkg to App Store Connect | In TestFlight; submit for review in App Store Connect | Same (review submission stays manual) |
-| GitHub | Creates the release with notes, the .apk and the Linux tarballs | Published | Published |
+| GitHub | Creates the release with notes, the .apk and the Linux tarballs and packages | Published | Published |
 
 `STORE_AUTO_SUBMIT` and `PLAY_TRACK` are repository variables (Settings > Secrets and
 variables > Actions > Variables). Leave `STORE_AUTO_SUBMIT` unset until a few drafts have gone
@@ -141,3 +143,22 @@ where it belongs.
 
 The Linux tarballs are named `Readout-<version>-linux-<arch>.tar.gz`. Unpack one and run
 `./readout/Readout`; the machine needs GTK 4.12+ and, for the meter, BlueZ.
+
+The packages (`readout_<version>-1_<amd64|arm64>.deb`, `readout-<version>-1.<x86_64|aarch64>.rpm`)
+install the same build to `/usr/lib/readout`, with `readout` on the path and a menu entry.
+`package-linux.sh` makes them from `publish-linux.sh`'s output; the job installs the x64 ones on
+Debian trixie and Fedora before attaching them.
+
+### packages.alejandro.md
+
+For a final release (not a prerelease), the `publish` job asks `amd989/packages` to publish the
+.deb and .rpm from the GitHub release; that repository holds the signing key and builds the apt
+and dnf repositories. It needs one repository secret, `PACKAGES_DISPATCH_TOKEN`: a fine-grained
+token with Contents read and write on `amd989/packages` (what a `repository_dispatch` needs).
+
+```bash
+gh secret set PACKAGES_DISPATCH_TOKEN -R amd989/readout
+```
+
+The apt repository carries Readout in trixie only: bookworm's GTK (4.8) is older than the 4.12
+the GTK4 backend needs.
