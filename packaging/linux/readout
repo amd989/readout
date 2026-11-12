@@ -1,0 +1,4 @@
+#!/bin/sh
+# Starts the self-contained build in /usr/lib/readout. A script rather than a symlink, so the
+# app's host finds its files next to the real executable whatever the caller's path.
+exec /usr/lib/readout/Readout "$@"

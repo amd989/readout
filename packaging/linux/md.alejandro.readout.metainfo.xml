@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>md.alejandro.readout</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Readout</name>
+  <summary>Live readings, graphs and logs from a Bluetooth multimeter</summary>
+  <developer id="md.alejandro">
+    <name>Alejandro Mora</name>
+  </developer>
+  <description>
+    <p>
+      Readout is a companion app for the EEVblog 121GW multimeter over Bluetooth LE. It shows the
+      meter's display, graphs readings over time, logs and exports them as CSV, and presses the
+      meter's buttons remotely.
+    </p>
+    <p>
+      The Linux build is a preview on the GTK4 backend for .NET MAUI. It needs BlueZ and a
+      Bluetooth LE adapter; the demo meter works without either.
+    </p>
+  </description>
+  <launchable type="desktop-id">md.alejandro.readout.desktop</launchable>
+  <url type="homepage">https://github.com/amd989/readout</url>
+  <url type="bugtracker">https://github.com/amd989/readout/issues</url>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <binary>readout</binary>
+  </provides>
+</component>
