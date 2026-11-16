@@ -480,9 +480,10 @@ jobs:
           TAG: ${{ needs.version.outputs.tag }}
         run: |
           set -euo pipefail
+          # Like the stores: without its secret this is left out with a warning, not failed.
           if [ -z "$GH_TOKEN" ]; then
-            echo "::error::PACKAGES_DISPATCH_TOKEN is not set. The release exists, but packages.alejandro.md was not asked to publish it. Set the secret, then run the publish workflow in amd989/packages by hand for $REPO $TAG."
-            exit 1
+            echo "::warning title=packages.alejandro.md skipped::Not set: PACKAGES_DISPATCH_TOKEN. The GitHub release has the .deb and .rpm; set the secret, then run the publish workflow in amd989/packages by hand for $REPO $TAG."
+            exit 0
           fi
           # -f rather than -F: -F converts values that look like numbers or
           # booleans, and the publisher expects the tag as a string.

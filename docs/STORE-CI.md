@@ -54,6 +54,9 @@ shows a warning naming the secrets that aren't set.
   `APP_STORE_CONNECT_*`): the package is built, but that store's job uploads nothing. Those
   secrets can live in the store's environment, which only its own job can read, so that job
   still asks for approval before it finds out.
+- Without `PACKAGES_DISPATCH_TOKEN`: the .deb and .rpm are on the GitHub release, but
+  packages.alejandro.md isn't asked to publish them. Run the publish workflow in
+  amd989/packages by hand for the tag once the secret is set.
 
 A store set up later only needs a new tag, or a manual run with an existing one.
 
