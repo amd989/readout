@@ -83,8 +83,11 @@ foreach ($Rid in $Rids) {
     # the version does, so a build on a later day would keep the old version.
     Remove-Item -Recurse -Force (Join-Path $Proj "obj/Release/$Tfm/$Rid/resizetizer/m") -ErrorAction SilentlyContinue
 
+    # AppxPackageDir pins where the .msix goes: by default it moved between SDK versions (CI's
+    # 10.0.404 put it in Readout/AppPackages).
     dotnet publish $Proj -f $Tfm -c Release `
         "-p:WindowsRuntimeIdentifier=$Rid" `
+        "-p:AppxPackageDir=$(Join-Path $Bin "$Rid/AppPackages")/" `
         "-p:ApplicationDisplayVersion=$Display.$Build" `
         "-p:ApplicationVersion=0" `
         "-p:AppxPackageSigningEnabled=false"

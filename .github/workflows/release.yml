@@ -289,13 +289,11 @@ jobs:
       matrix:
         include:
           - platform: ios
-            workload: maui-ios
             script: publish-ios.sh
             profile_secret: IOS_PROVISIONING_PROFILE
             profile_ext: mobileprovision
             output: Readout/bin/Release/net10.0-ios/ios-arm64/publish/*.ipa
           - platform: mac
-            workload: maui-maccatalyst
             script: publish-mac.sh
             profile_secret: MAC_PROVISIONING_PROFILE
             profile_ext: provisionprofile
@@ -313,10 +311,10 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      # Android too: on a Mac, restore covers every target framework in Readout.csproj, so it
-      # fails without the Android workload even for an iOS or Mac build.
+      # All three: on a Mac, restore covers every target framework in Readout.csproj (Android,
+      # iOS, Mac Catalyst), so it fails without any one of them, whichever app is being built.
       - name: Install the MAUI workloads
-        run: dotnet workload install ${{ matrix.workload }} maui-android
+        run: dotnet workload install maui-android maui-ios maui-maccatalyst
 
       # A throwaway keychain with the Apple Distribution and Mac Installer Distribution
       # certificates, searched before the login keychain so the publish scripts find them.
