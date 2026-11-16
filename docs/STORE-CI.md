@@ -44,6 +44,19 @@ version's number.
 send to. A failed job can also be re-run on its own from the run page. Every store refuses a
 build number it has already seen, so a store that took the upload needs a new tag.
 
+**Missing secrets** leave a platform out instead of failing the release; the run's summary
+shows a warning naming the secrets that aren't set.
+
+- Without the Android signing secrets: no .aab or .apk, so no Google Play upload and no .apk
+  on the GitHub release.
+- Without the Apple signing secrets: no iPhone or Mac build.
+- Without a store's upload secrets (`STORE_*`, `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`,
+  `APP_STORE_CONNECT_*`): the package is built, but that store's job uploads nothing. Those
+  secrets can live in the store's environment, which only its own job can read, so that job
+  still asks for approval before it finds out.
+
+A store set up later only needs a new tag, or a manual run with an existing one.
+
 ## Version numbers
 
 The tag is the version; `ApplicationDisplayVersion` in `Readout.csproj` is only used by local

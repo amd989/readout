@@ -56,6 +56,7 @@ jobs:
       submit: ${{ steps.tag.outputs.submit }}
       windows: ${{ steps.tag.outputs.windows }}
       android: ${{ steps.tag.outputs.android }}
+      android_build: ${{ steps.tag.outputs.android_build }}
       apple: ${{ steps.tag.outputs.apple }}
       github: ${{ steps.tag.outputs.github }}
     steps:
@@ -68,6 +69,14 @@ jobs:
           APPLE: ${{ github.event_name == 'push' || inputs.apple }}
           RELEASE: ${{ github.event_name == 'push' || inputs.github }}
           AUTO_SUBMIT: ${{ vars.STORE_AUTO_SUBMIT }}
+          # Whether the build signing secrets are set (true/false only, never their values).
+          # They're repository secrets, so this job can see them.
+          HAS_ANDROID_SIGNING: >-
+            ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEY_ALIAS != ''
+            && secrets.ANDROID_KEYSTORE_PASSWORD != '' }}
+          HAS_APPLE_SIGNING: >-
+            ${{ secrets.APPLE_CERTIFICATES_P12 != '' && secrets.APPLE_CERTIFICATES_PASSWORD != ''
+            && secrets.IOS_PROVISIONING_PROFILE != '' && secrets.MAC_PROVISIONING_PROFILE != '' }}
         run: |
           if [[ ! "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "::error::Release tags look like v1.2.3 or v1.2.3-beta.1, not $TAG."
@@ -88,6 +97,22 @@ jobs:
           submit=false
           if [ "$AUTO_SUBMIT" = true ] && [ "$prerelease" = false ]; then submit=true; fi
 
+          # A platform without its signing secrets is left out, not failed, so the rest of the
+          # release still goes out.
+          android_build=false
+          if [ "$ANDROID" = true ] || [ "$RELEASE" = true ]; then
+            if [ "$HAS_ANDROID_SIGNING" = true ]; then
+              android_build=true
+            else
+              echo "::warning title=Android skipped::No ANDROID_KEYSTORE_BASE64, ANDROID_KEY_ALIAS or ANDROID_KEYSTORE_PASSWORD secret: no Google Play upload and no .apk on the GitHub release."
+              ANDROID=false
+            fi
+          fi
+          if [ "$APPLE" = true ] && [ "$HAS_APPLE_SIGNING" != true ]; then
+            echo "::warning title=App Store skipped::No APPLE_CERTIFICATES_P12, APPLE_CERTIFICATES_PASSWORD, IOS_PROVISIONING_PROFILE or MAC_PROVISIONING_PROFILE secret: no iPhone or Mac build."
+            APPLE=false
+          fi
+
           {
             echo "tag=$TAG"
             echo "version=$major.$minor.$patch"
@@ -99,6 +124,7 @@ jobs:
             echo "submit=$submit"
             echo "windows=$WINDOWS"
             echo "android=$ANDROID"
+            echo "android_build=$android_build"
             echo "apple=$APPLE"
             echo "github=$RELEASE"
           } | tee -a "$GITHUB_OUTPUT"
@@ -154,7 +180,7 @@ jobs:
   android:
     needs: [version, test]
     # Also built for the GitHub release, which carries the .apk.
-    if: needs.version.outputs.android == 'true' || needs.version.outputs.github == 'true'
+    if: needs.version.outputs.android_build == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -365,11 +391,13 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/download-artifact@v4
+        if: needs.android.result == 'success'
         with:
           name: android
           path: android
 
       - uses: actions/download-artifact@v4
+        if: needs.linux.result == 'success'
         with:
           name: linux
           path: linux
@@ -419,6 +447,7 @@ jobs:
           TAG: ${{ needs.version.outputs.tag }}
           PRERELEASE: ${{ needs.version.outputs.prerelease }}
         run: |
+          shopt -s nullglob
           files=(android/*.apk linux/*.tar.gz linux/*.deb linux/*.rpm)
           title="Readout ${TAG#v}"
           if gh release view "$TAG" > /dev/null 2>&1; then
@@ -474,14 +503,39 @@ jobs:
     runs-on: windows-latest
     environment: microsoft-store
     steps:
+      # The upload secrets can live in the environment, which only this job can read, so the
+      # check is here: without them the job warns and uploads nothing.
+      - name: Check the secrets
+        id: secrets
+        shell: bash
+        env:
+          STORE_TENANT_ID: ${{ secrets.STORE_TENANT_ID }}
+          STORE_SELLER_ID: ${{ secrets.STORE_SELLER_ID }}
+          STORE_CLIENT_ID: ${{ secrets.STORE_CLIENT_ID }}
+          STORE_CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
+        run: |
+          missing=()
+          for name in STORE_TENANT_ID STORE_SELLER_ID STORE_CLIENT_ID STORE_CLIENT_SECRET; do
+            if [ -z "${!name}" ]; then missing+=("$name"); fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::warning title=Microsoft Store skipped::Not set: ${missing[*]}"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/download-artifact@v4
+        if: steps.secrets.outputs.ok == 'true'
         with:
           name: windows-store
           path: packages
 
       - uses: microsoft/setup-msstore-cli@v1
+        if: steps.secrets.outputs.ok == 'true'
 
       - name: Sign in to Partner Center
+        if: steps.secrets.outputs.ok == 'true'
         run: >
           msstore reconfigure
           --tenantId ${{ secrets.STORE_TENANT_ID }}
@@ -491,6 +545,7 @@ jobs:
 
       # Without auto submit: a draft submission to check and send from Partner Center.
       - name: Upload to the Store
+        if: steps.secrets.outputs.ok == 'true'
         shell: pwsh
         run: |
           $bundle = Get-ChildItem packages -Filter '*.msixbundle' | Select-Object -First 1
@@ -504,7 +559,20 @@ jobs:
     runs-on: ubuntu-latest
     environment: google-play
     steps:
+      - name: Check the secrets
+        id: secrets
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::warning title=Google Play skipped::Not set: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/download-artifact@v4
+        if: steps.secrets.outputs.ok == 'true'
         with:
           name: android
           path: packages
@@ -512,6 +580,7 @@ jobs:
       # Prereleases go to internal testing. Without auto submit, the release is a draft on
       # its track, to roll out from the Play Console.
       - uses: r0adkll/upload-google-play@v1
+        if: steps.secrets.outputs.ok == 'true'
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: md.alejandro.readout
@@ -525,7 +594,26 @@ jobs:
     runs-on: macos-26
     environment: app-store
     steps:
+      - name: Check the secrets
+        id: secrets
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
+        run: |
+          missing=()
+          for name in APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY; do
+            if [ -z "${!name}" ]; then missing+=("$name"); fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::warning title=App Store skipped::Not set: ${missing[*]}"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/download-artifact@v4
+        if: steps.secrets.outputs.ok == 'true'
         with:
           pattern: app-store-*
           path: packages
@@ -534,6 +622,7 @@ jobs:
       # Uploads land in App Store Connect and TestFlight once Apple has processed them; pick
       # the build for a version there and submit it for review.
       - name: Upload to App Store Connect
+        if: steps.secrets.outputs.ok == 'true'
         env:
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
