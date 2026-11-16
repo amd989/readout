@@ -42,7 +42,9 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
         _logger = logger;
 
         _adapter.ScanMode = ScanMode.LowLatency;
-        _adapter.DeviceDiscovered += OnDeviceDiscovered;
+        // Every advertisement, not just a device's first in each scan: the session drops a meter
+        // it stops hearing, so the list follows a meter that's switched off.
+        _adapter.DeviceAdvertised += OnDeviceAdvertised;
         _adapter.DeviceConnectionLost += (_, e) => OnLinkDropped(e.Device, e.ErrorMessage);
         _adapter.DeviceDisconnected += (_, e) => OnLinkDropped(e.Device, null);
     }
@@ -79,8 +81,10 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
         {
             try
             {
+                // allowDuplicatesKey: CoreBluetooth otherwise reports a device once per scan.
                 await _adapter.StartScanningForDevicesAsync(
                     deviceFilter: d => IsMeter(d.Name),
+                    allowDuplicatesKey: true,
                     cancellationToken: ct);
             }
             catch (OperationCanceledException)
@@ -269,7 +273,7 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
         }
     }
 
-    private void OnDeviceDiscovered(object? sender, DeviceEventArgs e)
+    private void OnDeviceAdvertised(object? sender, DeviceEventArgs e)
     {
         var device = e.Device;
         if (!IsMeter(device.Name)) return;

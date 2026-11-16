@@ -4,7 +4,8 @@ using Readout.Core.Simulation;
 namespace Readout.Core.Connection;
 
 /// <summary>
-/// A connection to <see cref="SimulatedMeter"/>: a scan finds it at once, and once connected
+/// A connection to <see cref="SimulatedMeter"/>: a scan finds it at once (and hears it again
+/// every second, as a real meter's advertisements are heard), and once connected
 /// it sends a packet every <see cref="Interval"/>, split across two "notifications" the way
 /// Bluetooth delivers them, so the driver's framing path is the real one.
 /// </summary>
@@ -15,6 +16,7 @@ public sealed class SimulatedMeterConnection : IMeterConnection, IDisposable
     private readonly SimulatedMeter _meter = new();
     private readonly TimeProvider _time;
     private CancellationTokenSource? _streamCts;
+    private ITimer? _advertising;
     private DateTimeOffset _poweredOn;
 
     public SimulatedMeterConnection(TimeProvider? time = null) => _time = time ?? TimeProvider.System;
@@ -43,19 +45,33 @@ public sealed class SimulatedMeterConnection : IMeterConnection, IDisposable
         if (State != ConnectionState.Disconnected) return Task.CompletedTask;
         SetState(ConnectionState.Scanning);
         MeterDiscovered?.Invoke(this, DemoMeter);
+        _advertising = _time.CreateTimer(_ => Advertise(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         return Task.CompletedTask;
     }
 
     public Task StopScanAsync()
     {
+        StopAdvertising();
         if (State == ConnectionState.Scanning) SetState(ConnectionState.Disconnected);
         return Task.CompletedTask;
+    }
+
+    private void Advertise()
+    {
+        if (State == ConnectionState.Scanning) MeterDiscovered?.Invoke(this, DemoMeter);
+    }
+
+    private void StopAdvertising()
+    {
+        _advertising?.Dispose();
+        _advertising = null;
     }
 
     public Task ConnectAsync(DiscoveredMeter meter, CancellationToken ct = default)
     {
         if (State == ConnectionState.Connected) return Task.CompletedTask;
 
+        StopAdvertising();
         Meter = DemoMeter;
         SetState(ConnectionState.Connecting);
         _poweredOn = _time.GetUtcNow();
@@ -133,5 +149,9 @@ public sealed class SimulatedMeterConnection : IMeterConnection, IDisposable
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public void Dispose() => StopStream();
+    public void Dispose()
+    {
+        StopStream();
+        StopAdvertising();
+    }
 }

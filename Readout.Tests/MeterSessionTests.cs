@@ -365,6 +365,54 @@ public sealed class MeterSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task Scan_ForgetsAMeterThatStopsAdvertising()
+    {
+        await _session.StartScanAsync();
+        _bluetooth.Discover(new DiscoveredMeter("off", "121GW", -60));
+        _bluetooth.Discover(new DiscoveredMeter("on", "121GW", -70));
+        var changes = 0;
+        _session.DiscoveredChanged += (_, _) => changes++;
+
+        // "on" keeps advertising; "off" was switched off.
+        for (var i = 0; i < 9; i++)
+        {
+            _time.Advance(TimeSpan.FromSeconds(1));
+            _bluetooth.Discover(new DiscoveredMeter("on", "121GW", -70));
+        }
+        Assert.Equal(["off", "on"], _session.Discovered.Select(m => m.Id));
+
+        _time.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal("on", Assert.Single(_session.Discovered).Id);
+        Assert.Equal(10, changes);
+    }
+
+    [Fact]
+    public async Task Scan_ListsAMeterAgainWhenItIsBack()
+    {
+        await _session.StartScanAsync();
+        _bluetooth.Discover(Meter);
+        _time.Advance(MeterSession.ForgetAfter);
+        Assert.Empty(_session.Discovered);
+
+        _bluetooth.Discover(Meter);
+
+        Assert.Equal(Meter, Assert.Single(_session.Discovered));
+        _time.Advance(MeterSession.ForgetAfter - TimeSpan.FromSeconds(1));
+        Assert.Single(_session.Discovered);
+    }
+
+    [Fact]
+    public async Task SimulatedScan_KeepsTheDemoMeterListed()
+    {
+        var session = new MeterSession(_demo, new FakeBluetooth(), _time);
+        await session.StartScanAsync();
+
+        _time.Advance(MeterSession.ForgetAfter * 3);
+
+        Assert.Equal(SimulatedMeterConnection.DemoMeter, Assert.Single(session.Discovered));
+    }
+
+    [Fact]
     public async Task ConnectionLost_ScansAndReconnectsWhenTheMeterIsBack()
     {
         await _session.ConnectAsync(Meter);

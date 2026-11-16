@@ -6,6 +6,18 @@ Windows and Linux. Built with .NET 10 and .NET MAUI.
 **[Website](https://amd989.github.io/readout/)** · [Support](https://amd989.github.io/readout/support.html) ·
 [Privacy](https://amd989.github.io/readout/privacy.html) · [The 121GW](https://www.eevblog.com/product/121gw/)
 
+<a href="https://apps.apple.com/app/id6827965871">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/app-store-badge-light.svg">
+    <img src="docs/app-store-badge-dark.svg" width="132" height="44" alt="Download on the App Store">
+  </picture>
+</a>
+<a href="https://apps.apple.com/app/id6827965871?platform=mac">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/mac-app-store-badge-light.svg">
+    <img src="docs/mac-app-store-badge-dark.svg" width="172" height="44" alt="Download on the Mac App Store">
+  </picture>
+</a>
 <a href="https://apps.microsoft.com/detail/9P80492G34GN">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/ms-store-badge-light.svg">

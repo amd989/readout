@@ -19,7 +19,8 @@ public sealed class MeterSession
     private readonly IMeterConnection _bluetooth;
     private readonly IMeterConnection _demo;
     private readonly TimeProvider _time;
-    private readonly Dictionary<string, DiscoveredMeter> _discovered = [];
+    private readonly Dictionary<string, (DiscoveredMeter Meter, DateTimeOffset Heard)> _discovered = [];
+    private ITimer? _forgetTimer;
     private bool _userDisconnected;
     private bool _autoConnect;
 
@@ -94,9 +95,16 @@ public sealed class MeterSession
     /// <summary>Signal strength of the connected meter in dBm; null when unknown.</summary>
     public int? SignalStrength => Active.SignalStrength;
 
-    /// <summary>Meters seen in the current scan, strongest signal first.</summary>
+    /// <summary>
+    /// A meter not heard for this long has gone (switched off, out of range, or connected to
+    /// another phone) and leaves <see cref="Discovered"/>. Meters advertise several times a
+    /// second, and the connections report every advertisement.
+    /// </summary>
+    public static readonly TimeSpan ForgetAfter = TimeSpan.FromSeconds(10);
+
+    /// <summary>Meters heard in the current scan, strongest signal first.</summary>
     public IReadOnlyList<DiscoveredMeter> Discovered =>
-        [.. _discovered.Values.OrderByDescending(m => m.Rssi)];
+        [.. _discovered.Values.Select(d => d.Meter).OrderByDescending(m => m.Rssi)];
 
     public event EventHandler? StateChanged;
     public event EventHandler? DiscoveredChanged;
@@ -124,8 +132,8 @@ public sealed class MeterSession
     {
         await LeaveDemoAsync().ConfigureAwait(false);
         _autoConnect = autoConnect;
-        // A scan already running (a background reconnect) keeps its list: Bluetooth stacks
-        // report each device once per scan, so what it found won't be reported again.
+        // A scan already running (a background reconnect) keeps its list, so the meters it
+        // has heard show at once instead of at their next advertisement.
         if (_bluetooth.State != ConnectionState.Scanning)
         {
             _discovered.Clear();
@@ -225,11 +233,29 @@ public sealed class MeterSession
 
     private void OnDiscovered(DiscoveredMeter meter)
     {
-        _discovered[meter.Id] = meter;
+        _discovered[meter.Id] = (meter, _time.GetUtcNow());
+        _forgetTimer ??= _time.CreateTimer(_ => Dispatch(ForgetSilentMeters), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         DiscoveredChanged?.Invoke(this, EventArgs.Empty);
 
         if (_autoConnect && meter.Id == PreferredMeterId && !IsDemo && _bluetooth.State == ConnectionState.Scanning)
             _ = ConnectQuietlyAsync(meter);
+    }
+
+    // Drops the meters that have gone quiet; the timer runs only while the list has any.
+    private void ForgetSilentMeters()
+    {
+        var now = _time.GetUtcNow();
+        var silent = _discovered.Where(d => now - d.Value.Heard >= ForgetAfter).Select(d => d.Key).ToList();
+        foreach (var id in silent)
+            _discovered.Remove(id);
+
+        if (_discovered.Count == 0)
+        {
+            _forgetTimer?.Dispose();
+            _forgetTimer = null;
+        }
+        if (silent.Count > 0)
+            DiscoveredChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnConnectionLost()
