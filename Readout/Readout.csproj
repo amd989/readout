@@ -39,6 +39,13 @@
 	<!-- Mac Debug signing (so macOS remembers the Bluetooth permission across rebuilds) is set
 	     per machine in Directory.Build.local.props; see Directory.Build.local.props.example. -->
 
+	<!-- Android Release: an .aab for Google Play and an .apk for the GitHub release. Set here, not
+	     with -p on the command line: there an escaped %3B makes one value, "aab;apk", and Release
+	     then builds only the .aab. -->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' and '$(Configuration)' == 'Release'">
+		<AndroidPackageFormats>aab;apk</AndroidPackageFormats>
+	</PropertyGroup>
+
 	<!-- The Mac App Store needs both architectures. -->
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst' and '$(Configuration)' == 'Release'">
 		<RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers>

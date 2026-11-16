@@ -313,8 +313,10 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Install the MAUI workload
-        run: dotnet workload install ${{ matrix.workload }}
+      # Android too: on a Mac, restore covers every target framework in Readout.csproj, so it
+      # fails without the Android workload even for an iOS or Mac build.
+      - name: Install the MAUI workloads
+        run: dotnet workload install ${{ matrix.workload }} maui-android
 
       # A throwaway keychain with the Apple Distribution and Mac Installer Distribution
       # certificates, searched before the login keychain so the publish scripts find them.
