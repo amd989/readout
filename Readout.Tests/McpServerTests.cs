@@ -68,7 +68,7 @@ public sealed class McpServerTests : IAsyncLifetime
     {
         var result = await _client!.CallToolAsync(tool, args ?? [], cancellationToken: TestContext.Current.CancellationToken);
         var text = string.Concat(result.Content.OfType<TextContentBlock>().Select(t => t.Text));
-        var json = result.IsError == true ? default : JsonDocument.Parse(text).RootElement.Clone();
+        var json = result.IsError == true ? default : JsonElement.Parse(text);
         return (json, result.IsError == true, text);
     }
 
@@ -330,16 +330,16 @@ public sealed class McpServerTests : IAsyncLifetime
     {
         var address = $"http://{McpHttpServer.Host}:47121/mcp";
 
-        var vsCode = JsonDocument.Parse(McpSetup.For(McpClientKind.VsCode, 47121, "abc")).RootElement.GetProperty("servers").GetProperty("readout");
+        var vsCode = JsonElement.Parse(McpSetup.For(McpClientKind.VsCode, 47121, "abc")).GetProperty("servers").GetProperty("readout");
         Assert.Equal("http", vsCode.GetProperty("type").GetString());
         Assert.Equal(address, vsCode.GetProperty("url").GetString());
         Assert.Equal("Bearer abc", vsCode.GetProperty("headers").GetProperty("Authorization").GetString());
 
-        var cursor = JsonDocument.Parse(McpSetup.For(McpClientKind.Cursor, 47121, "abc")).RootElement.GetProperty("mcpServers").GetProperty("readout");
+        var cursor = JsonElement.Parse(McpSetup.For(McpClientKind.Cursor, 47121, "abc")).GetProperty("mcpServers").GetProperty("readout");
         Assert.Equal(address, cursor.GetProperty("url").GetString());
         Assert.Equal("Bearer abc", cursor.GetProperty("headers").GetProperty("Authorization").GetString());
 
-        var desktop = JsonDocument.Parse(McpSetup.For(McpClientKind.ClaudeDesktop, 47121, "abc")).RootElement.GetProperty("mcpServers").GetProperty("readout");
+        var desktop = JsonElement.Parse(McpSetup.For(McpClientKind.ClaudeDesktop, 47121, "abc")).GetProperty("mcpServers").GetProperty("readout");
         Assert.Equal("npx", desktop.GetProperty("command").GetString());
         Assert.Equal(["mcp-remote@latest", address, "--allow-http", "--header", "Authorization:${READOUT_AUTH}"],
             desktop.GetProperty("args").EnumerateArray().Select(a => a.GetString()));
