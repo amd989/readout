@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Readout
+GenericName=Multimeter
+Comment=Live readings, graphs and logs from a Bluetooth multimeter
+Exec=readout
+Icon=md.alejandro.readout
+Terminal=false
+Categories=Utility;Electronics;
+Keywords=multimeter;meter;121GW;Bluetooth;measurement;
+StartupNotify=true
+StartupWMClass=md.alejandro.readout

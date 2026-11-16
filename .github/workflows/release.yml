@@ -1,11 +1,14 @@
 # Releases from a git tag. Push vX.Y.Z (or vX.Y.Z-beta.1 for a prerelease) and this:
 #   1. runs the tests,
 #   2. builds the Microsoft Store bundle, the Google Play .aab (plus an .apk), the iPhone/iPad
-#      .ipa, the Mac .pkg and the Linux tarballs, with the version taken from the tag,
+#      .ipa, the Mac .pkg and the Linux tarballs, .deb and .rpm packages, with the version taken
+#      from the tag,
 #   3. publishes a GitHub release with notes from the commit messages, the .apk and the Linux
-#      tarballs (Linux has no store, so this is where it ships),
+#      tarballs and packages (Linux has no store, so this is where it ships),
 #   4. sends the packages to each store. Each store job waits in its environment
-#      (microsoft-store, google-play, app-store) until a reviewer approves it.
+#      (microsoft-store, google-play, app-store) until a reviewer approves it,
+#   5. for a final release, asks amd989/packages to put the .deb and .rpm on
+#      packages.alejandro.md (needs the PACKAGES_DISPATCH_TOKEN secret).
 # Setup, secrets and version numbers: docs/STORE-CI.md.
 name: Release
 
@@ -225,10 +228,31 @@ jobs:
             cp "Readout.Linux/bin/publish/Readout-linux-$arch.tar.gz" "artifacts/linux/Readout-$VERSION-linux-$arch.tar.gz"
           done
 
+      # The same builds as a .deb and an .rpm per architecture, for packages.alejandro.md.
+      - name: Build the .deb and .rpm packages
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rpm
+          ./package-linux.sh "${TAG#v}" x64 arm64
+
+      # Where they're published for: Debian trixie (bookworm's GTK is too old) and Fedora. Catches
+      # a dependency that doesn't resolve there.
+      - name: Check the packages install
+        run: |
+          docker run --rm -v "$PWD/artifacts/linux:/p:ro" debian:trixie bash -c \
+            'apt-get update -qq && apt-get install -y -qq --no-install-recommends /p/readout_*_amd64.deb && test -x /usr/lib/readout/Readout'
+          docker run --rm -v "$PWD/artifacts/linux:/p:ro" fedora:latest bash -c \
+            'dnf install -y -q /p/readout-*.x86_64.rpm && test -x /usr/lib/readout/Readout'
+
       - uses: actions/upload-artifact@v4
         with:
           name: linux
-          path: artifacts/linux/*.tar.gz
+          path: |
+            artifacts/linux/*.tar.gz
+            artifacts/linux/*.deb
+            artifacts/linux/*.rpm
 
   apple:
     needs: [version, test]
@@ -395,7 +419,7 @@ jobs:
           TAG: ${{ needs.version.outputs.tag }}
           PRERELEASE: ${{ needs.version.outputs.prerelease }}
         run: |
-          files=(android/*.apk linux/*.tar.gz)
+          files=(android/*.apk linux/*.tar.gz linux/*.deb linux/*.rpm)
           title="Readout ${TAG#v}"
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release edit "$TAG" --title "$title" --notes-file "$RUNNER_TEMP/notes.md" --prerelease="$PRERELEASE"
@@ -404,6 +428,44 @@ jobs:
             gh release create "$TAG" "${files[@]}" --verify-tag --title "$title" \
               --notes-file "$RUNNER_TEMP/notes.md" --prerelease="$PRERELEASE"
           fi
+
+  # ---------------------------------------------------------------- packages.alejandro.md
+
+  # Packages are published centrally by amd989/packages, which serves
+  # packages.alejandro.md. This repository builds, attaches the artifacts to
+  # its own GitHub Release, and asks the publisher to pick that release up.
+  # The signing key and the storage credentials live only over there.
+  publish:
+    needs: [version, github-release]
+    # Final releases only: a beta in the apt and dnf repositories would reach every user. The
+    # tag comes from the version job, so a run started by hand publishes that tag too.
+    if: >-
+      !cancelled() && needs.github-release.result == 'success'
+      && needs.version.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish to packages.alejandro.md
+        env:
+          GH_TOKEN: ${{ secrets.PACKAGES_DISPATCH_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::PACKAGES_DISPATCH_TOKEN is not set. The release exists, but packages.alejandro.md was not asked to publish it. Set the secret, then run the publish workflow in amd989/packages by hand for $REPO $TAG."
+            exit 1
+          fi
+          # -f rather than -F: -F converts values that look like numbers or
+          # booleans, and the publisher expects the tag as a string.
+          gh api repos/amd989/packages/dispatches \
+            -f event_type=publish \
+            -f "client_payload[repo]=$REPO" \
+            -f "client_payload[tag]=$TAG"
+          {
+            echo "### Asked packages.alejandro.md to publish \`$REPO\` \`$TAG\`"
+            echo
+            echo "Follow it at https://github.com/amd989/packages/actions/workflows/publish.yaml"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------- store submissions
 
