@@ -17,7 +17,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJ="$SCRIPT_DIR/Readout"
-PUBLISH="$PROJ/bin/Release/net10.0-android/publish"
+OUTPUT="$PROJ/bin/Release/net10.0-android"
+PUBLISH="$OUTPUT/publish"
 OUT="$SCRIPT_DIR/artifacts/android"
 BUILD="${1:-$(date -u +%y%j%H%M)}"
 NAME="${DISPLAY_VERSION:-$(sed -n 's:.*<ApplicationDisplayVersion>\(.*\)</ApplicationDisplayVersion>.*:\1:p' "$PROJ/Readout.csproj" | head -1)}"
@@ -29,8 +30,11 @@ export ANDROID_KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}
 export ANDROID_KEYSTORE_PASSWORD
 
 echo "==> Building $NAME ($BUILD)..."
-# Stale packages from an earlier build would otherwise be picked up below.
+# Stale packages from an earlier build would otherwise be picked up below: only files newer
+# than the stamp count.
 rm -rf "$PUBLISH"
+STAMP="$(mktemp)"
+trap 'rm -f "$STAMP"' EXIT
 # The passwords go through environment variables (env:), so they stay out of the build log.
 # %3B is an escaped ';' (MSBuild list separator).
 dotnet publish "$PROJ" -f net10.0-android -c Release \
@@ -43,12 +47,15 @@ dotnet publish "$PROJ" -f net10.0-android -c Release \
   -p:ApplicationDisplayVersion="$NAME" \
   -p:ApplicationVersion="$BUILD"
 
-AAB="$(ls "$PUBLISH"/*-Signed.aab 2>/dev/null | head -1)"
-APK="$(ls "$PUBLISH"/*-Signed.apk 2>/dev/null | head -1)"
+# Usually in publish/, but newer Android workloads can put them in a runtime-specific folder.
+AAB="$(find "$OUTPUT" -name '*-Signed.aab' -newer "$STAMP" | head -1)"
+APK="$(find "$OUTPUT" -name '*-Signed.apk' -newer "$STAMP" | head -1)"
 if [ -z "$AAB" ] || [ -z "$APK" ]; then
-  echo "Expected a signed .aab and .apk in $PUBLISH." >&2
+  echo "Expected a signed .aab and .apk under $OUTPUT. The build made:" >&2
+  find "$OUTPUT" \( -name '*.aab' -o -name '*.apk' \) -newer "$STAMP" >&2
   exit 1
 fi
+echo "==> Found $AAB and $APK"
 
 mkdir -p "$OUT"
 cp "$AAB" "$OUT/Readout-$NAME.aab"

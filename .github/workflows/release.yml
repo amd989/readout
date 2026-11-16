@@ -333,7 +333,10 @@ jobs:
           rm "$RUNNER_TEMP/certificates.p12"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
-          security find-identity -v
+          # Only the kinds of certificate: the full names carry the account email, and the log is
+          # public. iOS needs "Apple Distribution"; Mac also "3rd Party Mac Developer Installer".
+          echo "Certificates imported:"
+          security find-identity -v | sed -n 's/.*"\([^:"]*\):.*/  \1/p'
 
       # The publish scripts pick the profile by name, so pass them the name inside it.
       - name: Install the provisioning profile
