@@ -305,7 +305,8 @@ jobs:
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          # Pinned with the workload version below: workload 10.0.402 and later need Xcode 27.
+          xcode-version: '26.6'
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -313,8 +314,10 @@ jobs:
 
       # All three: on a Mac, restore covers every target framework in Readout.csproj (Android,
       # iOS, Mac Catalyst), so it fails without any one of them, whichever app is being built.
+      # 10.0.401 is the last workload set built against the 26.x Apple SDKs (Xcode 26); from
+      # 10.0.402 they need Xcode 27, which macos-26 doesn't have (the Mac build fails MT4162).
       - name: Install the MAUI workloads
-        run: dotnet workload install maui-android maui-ios maui-maccatalyst
+        run: dotnet workload install maui-android maui-ios maui-maccatalyst --version 10.0.401
 
       # A throwaway keychain with the Apple Distribution and Mac Installer Distribution
       # certificates, searched before the login keychain so the publish scripts find them.
@@ -553,7 +556,10 @@ jobs:
         shell: pwsh
         run: |
           $bundle = Get-ChildItem packages -Filter '*.msixbundle' | Select-Object -First 1
-          $draft = if ('${{ needs.version.outputs.submit }}' -eq 'true') { @() } else { @('--noCommit') }
+          # Assigned on its own line: an if expression unwraps a one-item array to a string, and
+          # @draft would then pass it one character at a time.
+          $draft = @('--noCommit')
+          if ('${{ needs.version.outputs.submit }}' -eq 'true') { $draft = @() }
           msstore publish $bundle.FullName --appId 9P80492G34GN @draft
           if ($LASTEXITCODE -ne 0) { throw "msstore publish failed" }
 
