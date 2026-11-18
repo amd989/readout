@@ -14,6 +14,11 @@ set -euo pipefail
 #
 # Debian's dependencies are trixie's: GTK 4.12 or later rules out bookworm (4.8), and ICU's
 # package is named after its version.
+#
+# FORMATS="deb" or "rpm" makes only one. The release workflow builds the .rpm on EL9
+# (almalinux:9): an rpm built by rpm 6 (Ubuntu 26.04 and later) and then signed for
+# packages.alejandro.md keeps its signature where only rpm 6 looks, so EL9's dnf takes it for
+# unsigned and refuses it.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PUBLISH="$SCRIPT_DIR/Readout.Linux/bin/publish"
@@ -27,6 +32,9 @@ fi
 VERSION="$1"
 shift
 ARCHS=("${@:-x64}")
+FORMATS="${FORMATS:-deb rpm}"
+case " $FORMATS " in *" deb "*|*" rpm "*) ;; *) echo "FORMATS should list deb, rpm or both." >&2; exit 1 ;; esac
+wants() { [[ " $FORMATS " == *" $1 "* ]]; }
 
 PKG_VERSION="${VERSION/-/\~}"
 if [[ ! "$PKG_VERSION" =~ ^[0-9]+(\.[0-9]+)*(~[0-9A-Za-z.]+)?$ ]]; then
@@ -74,6 +82,7 @@ for ARCH in "${ARCHS[@]}"; do
     *) echo "Unknown architecture '$ARCH' (x64 or arm64)." >&2; exit 1 ;;
   esac
 
+  if wants deb; then
   echo "==> readout_${DEB_VERSION}_$DEB_ARCH.deb"
   root="$WORK/deb-$ARCH"
   stage "$ARCH" "$root"
@@ -105,7 +114,9 @@ Description: companion app for Bluetooth multimeters like the EEVblog 121GW
  The Linux build is a preview on the GTK4 backend for .NET MAUI.
 EOF
   dpkg-deb --root-owner-group -Zxz --build "$root" "$OUT/readout_${DEB_VERSION}_$DEB_ARCH.deb"
+  fi
 
+  if wants rpm; then
   echo "==> readout-$PKG_VERSION-1.$RPM_ARCH.rpm"
   root="$WORK/rpm-$ARCH"
   stage "$ARCH" "$root"
@@ -117,7 +128,9 @@ EOF
     --define "_stagedir $root" \
     "$FILES/readout.spec"
   cp "$WORK/rpmbuild/RPMS/$RPM_ARCH/"*.rpm "$OUT/"
+  fi
 done
 
 echo "==> Done:"
+shopt -s nullglob
 ls -lh "$OUT"/*.deb "$OUT"/*.rpm

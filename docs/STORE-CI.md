@@ -27,7 +27,7 @@ Then approve the store jobs in the run (Actions > Release > Review deployments).
 
 | Store | What the workflow does | Default | With `STORE_AUTO_SUBMIT` |
 |---|---|---|---|
-| Microsoft Store | Uploads the bundle to Partner Center | Draft submission, sent from Partner Center | Submitted for certification |
+| Microsoft Store | Uploads the bundle to Partner Center | Submitted for certification | Same |
 | Google Play | Uploads the .aab to a track (`PLAY_TRACK`, default `internal`) | Draft release, rolled out from the Play Console | Rolled out (`completed`) |
 | App Store | Uploads the .ipa and .pkg to App Store Connect | In TestFlight; submit for review in App Store Connect | Same (review submission stays manual) |
 | GitHub | Creates the release with notes, the .apk and the Linux tarballs and packages | Published | Published |
@@ -35,6 +35,12 @@ Then approve the store jobs in the run (Actions > Release > Review deployments).
 `STORE_AUTO_SUBMIT` and `PLAY_TRACK` are repository variables (Settings > Secrets and
 variables > Actions > Variables). Leave `STORE_AUTO_SUBMIT` unset until a few drafts have gone
 through cleanly.
+
+**The Microsoft Store always submits.** Approving the `microsoft-store` job is the decision to
+send the build to certification. Partner Center only takes an uploaded package into a
+submission when the submission is committed (which is what submits it): an uncommitted draft
+kept the previous version's packages, and the new bundle never showed up. To check a build
+before it goes out, download the run's `windows-store` artifact and test it before approving.
 
 **Prereleases** (`v1.2.0-beta.1`): a GitHub prerelease, Google Play internal testing and
 TestFlight, never auto submitted. The Microsoft Store is skipped: it would take the final
@@ -164,6 +170,14 @@ The packages (`readout_<version>-1_<amd64|arm64>.deb`, `readout-<version>-1.<x86
 install the same build to `/usr/lib/readout`, with `readout` on the path and a menu entry.
 `package-linux.sh` makes them from `publish-linux.sh`'s output; the job installs the x64 ones on
 Debian trixie and Fedora before attaching them.
+
+The .rpm is built in an `almalinux:9` container, not on the Ubuntu runner. Ubuntu 26.04 has
+rpm 6, and an rpm built by rpm 6 keeps its signature, once packages.alejandro.md signs it,
+where EL9's rpm 4.16 doesn't look: dnf there takes it for unsigned and the publish fails ("el9
+cannot verify these signatures"). The job checks this before attaching anything: it signs
+copies with a throwaway key using the runner's rpm 6, as packages.alejandro.md does, and
+verifies them on AlmaLinux 9. Locally, `FORMATS=rpm ./package-linux.sh <version> x64 arm64`
+in an EL9 container does the same as the job.
 
 ### packages.alejandro.md
 
