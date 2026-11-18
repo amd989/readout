@@ -16,7 +16,8 @@ Readout is a companion app for the EEVblog 121GW multimeter over Bluetooth LE, b
 - `Readout.Linux/`: the Linux head (see Linux below). `BlueZ/` is the meter connection over BlueZ; the other files fill gaps in the GTK backend.
 - `Readout.Tests/`: xUnit v3 tests for the core and the MCP server (end to end with the SDK's client), plus the Linux head's `BlueZNames` and `RecentRssi`, compiled in as linked files (they must stay free of D-Bus and GTK).
 - `docs/PROTOCOL.md`: the packet format. Read it before touching `Protocol/` or `Display/`.
-- `Readout.Core/Fs9721/`: the decoder for Fortune FS9721_LP3 meters (a DIY Bluetooth bridge on cheap meters), written from Fortune's datasheet. Readings go through the same log, graphs and MCP tools. `firmware/fs9721-bridge/` is the ESP32 bridge (PlatformIO, NimBLE) that forwards the chip's bytes over BLE; its UUIDs and name must match `Protocol/BridgeBluetooth` (a test checks). `docs/FS9721.md` has the frame format and the plan. Tests use real frames from `Readout.Tests/TestData/fs9721-890g.txt`.
+- `Readout.Core/Fs9721/`: the decoder for Fortune FS9721_LP3 meters (a DIY Bluetooth bridge on cheap meters), written from Fortune's datasheet. Readings go through the same log, graphs and MCP tools. `firmware/readout-bridge/` is the ESP32 bridge (PlatformIO, NimBLE) that forwards the chip's bytes over BLE, with a chip profile picked at build time (`fs9721-*` and `dso150-*` envs); its UUIDs, name and MTU must match `Protocol/BridgeBluetooth` (a test checks). `docs/FS9721.md` has the frame format and the plan. Tests use real frames from `Readout.Tests/TestData/fs9721-890g.txt`.
+- `Readout.Core/Dso150/`: the JYE Tech DSO150 oscilloscope running DSOShell (the user's open firmware for it, in its own repo: the plan is its `docs/READOUT.md`, the wire protocol its `docs/PROTOCOL.md`). Through the bridge's two-way `dso150-*` builds: 115200 8N1, and the app writes commands to the bridge's RX characteristic with `IMeterConnection.SendAsync` (`MeterSession.SendAsync`). `Dso150Driver` is a placeholder that makes no readings yet; `BleMeterConnection` logs what a DSO150 sends (`dso150 rx ...`) until it decodes them. Bridges get MTU 247 (`RequestMtuAsync`; only Android needs the request).
 
 The protocol is ported from the official EEVblog app's `PrivatePostRelease` branch (https://gitlab.com/eevblog/app-121gw, MIT, David Ledger), and matches EEVblog's "Revised Packet Format Blob V2" document. Its `master` branch has an obsolete 52-character text parser; ignore it. Keep the David Ledger credit in THIRD_PARTY_NOTICES.md and the About page.
 
@@ -38,7 +39,7 @@ dotnet build Readout -f net10.0-android
 git tag v1.2.0 && git push origin v1.2.0   # release.yml: every store + a GitHub release (docs/STORE-CI.md)
 dotnet build Readout.Linux       # the Linux head (plain net10.0, builds on the Mac too, no workload)
 ./publish-linux.sh x64 arm64     # self-contained Readout-linux-<arch>.tar.gz in Readout.Linux/bin/publish/
-./deploy-esp.sh       # build and flash the FS9721 bridge to an ESP32 on USB (--log follows it; other builds: esp32dev-vdd, esp32c3…)
+./deploy-esp.sh       # build and flash the bridge to an ESP32 on USB (--log follows it; default fs9721-esp32dev, others: fs9721-esp32c3, dso150-esp32dev…)
 ```
 
 ## Things to know
