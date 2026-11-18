@@ -8,6 +8,9 @@
 //   14-byte frames of LCD segments, usually through an optocoupler. It turns on and off with the
 //   meter: when no data has arrived for SLEEP_AFTER_S seconds (the meter is off, or its serial
 //   output is), it goes to deep sleep, and the next change on the input line wakes it.
+// - DTM0660 (CHIP_DTM0660): a cheap meter's DTM0660 chip, wired like the FS9721 and with the
+//   same settings: receive-only, 2400 baud, 8N1, 15-byte frames. The meter's serial output must
+//   be turned on in its EEPROM first (docs/SERIAL-METERS.md).
 // - DSO150 (CHIP_DSO150): a JYE Tech DSO150 oscilloscope running DSOShell. Two-way at 115200
 //   baud, 8N1, wired directly (both sides are 3.3 V). What the app writes to the RX
 //   characteristic goes out the UART unchanged. It never sleeps: the scope is quiet until asked.
@@ -34,7 +37,12 @@
 // pause this long means the chip has stopped talking for now.
 #define FLUSH_GAP_US 3000
 #else
+#if defined(CHIP_DTM0660)
+#define CHIP_NAME "DTM0660"
+#else
 #define CHIP_NAME "FS9721"
+#define CHIP_FS9721 1
+#endif
 #define TWO_WAY 0
 #ifndef UART_BAUD
 #define UART_BAUD 2400
@@ -42,7 +50,7 @@
 #ifndef SLEEP_AFTER_S
 #define SLEEP_AFTER_S 10  // 0 never sleeps
 #endif
-// A byte takes about 4 ms at 2400 baud and frames come about 300 ms apart, so a pause this
+// A byte takes about 4 ms at 2400 baud and frames come a few hundred ms apart, so a pause this
 // long means the frame is done: send what has arrived in one notification.
 #define FLUSH_GAP_US 15000
 #endif
@@ -56,7 +64,7 @@
 #ifndef UART_RX_INVERTED
 #define UART_RX_INVERTED 0
 #endif
-#ifndef METER_SYMBOLS
+#if defined(CHIP_FS9721) && !defined(METER_SYMBOLS)
 #define METER_SYMBOLS "°F,hFE,°C,"
 #endif
 #ifndef LED_PIN
@@ -66,7 +74,7 @@
 #define LED_ACTIVE_LOW 0
 #endif
 
-static const char *FIRMWARE_VERSION = "0.3.0";
+static const char *FIRMWARE_VERSION = "0.4.0";
 static const char *CHIP = CHIP_NAME;
 
 // Must match BridgeBluetooth in the app.
@@ -269,7 +277,7 @@ static void startBluetooth() {
 
   NimBLECharacteristic *info = service->createCharacteristic(INFO_UUID, NIMBLE_PROPERTY::READ);
   String text = String("chip=") + CHIP + "\nbaud=" + UART_BAUD + "\nfirmware=" + FIRMWARE_VERSION;
-#if !TWO_WAY
+#if defined(CHIP_FS9721)
   text += String("\nsymbols=") + METER_SYMBOLS;
 #endif
   info->setValue(text.c_str());

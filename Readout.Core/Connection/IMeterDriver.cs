@@ -1,5 +1,6 @@
 using Readout.Core.Display;
 using Readout.Core.Dso150;
+using Readout.Core.Dtm0660;
 using Readout.Core.Fs9721;
 
 namespace Readout.Core.Connection;
@@ -32,6 +33,7 @@ public static class MeterDrivers
         MeterModel.Eevblog121Gw => new Eevblog121GwDriver(),
         MeterModel.Fs9721 => new Fs9721Driver(),
         MeterModel.Dso150 => new Dso150Driver(),
+        MeterModel.Dtm0660 => new Dtm0660Driver(),
         _ => throw new ArgumentOutOfRangeException(nameof(model), model, "No driver for this meter."),
     };
 }

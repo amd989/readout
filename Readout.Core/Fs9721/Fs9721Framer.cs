@@ -7,41 +7,25 @@ namespace Readout.Core.Fs9721;
 /// </summary>
 public sealed class Fs9721Framer
 {
-    private readonly byte[] _buffer = new byte[Fs9721Frame.Length];
-    private int _count;
+    private readonly NumberedFramer _framer = new(Fs9721Frame.Length);
 
-    /// <summary>Partial frames dropped because a byte came out of order.</summary>
-    public int RejectedBytes { get; private set; }
+    /// <summary>Bytes dropped because they came out of order.</summary>
+    public int RejectedBytes => _framer.RejectedBytes;
 
     /// <summary>Adds bytes and returns every whole frame they complete, oldest first.</summary>
     public IReadOnlyList<Fs9721Frame> Push(ReadOnlySpan<byte> bytes)
     {
-        List<Fs9721Frame>? frames = null;
-        foreach (var b in bytes)
+        var raw = _framer.Push(bytes);
+        if (raw.Count == 0)
+            return [];
+        var frames = new List<Fs9721Frame>(raw.Count);
+        foreach (var bytesOfFrame in raw)
         {
-            var number = b >> 4;
-            if (number == _count + 1)
-            {
-                _buffer[_count++] = b;
-            }
-            else
-            {
-                RejectedBytes++;
-                // Out of step: a byte numbered 1 starts a new frame, anything else is dropped.
-                _count = 0;
-                if (number == 1)
-                    _buffer[_count++] = b;
-            }
-
-            if (_count == Fs9721Frame.Length)
-            {
-                _count = 0;
-                if (Fs9721Frame.TryParse(_buffer, out var frame))
-                    (frames ??= []).Add(frame);
-            }
+            if (Fs9721Frame.TryParse(bytesOfFrame, out var frame))
+                frames.Add(frame);
         }
-        return frames ?? (IReadOnlyList<Fs9721Frame>)[];
+        return frames;
     }
 
-    public void Reset() => _count = 0;
+    public void Reset() => _framer.Reset();
 }

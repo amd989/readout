@@ -21,11 +21,15 @@ public sealed record MeterCapabilities(bool RemoteKeys, bool ClockSync, bool Sub
     /// </summary>
     public static readonly MeterCapabilities Dso150 = new(RemoteKeys: false, ClockSync: false, SubDisplay: false, BarGraph: false, Digits: 4);
 
+    /// <summary>A DTM0660 through a bridge: it only sends, 6000 counts on four digits, nothing else.</summary>
+    public static readonly MeterCapabilities Dtm0660 = new(RemoteKeys: false, ClockSync: false, SubDisplay: false, BarGraph: false, Digits: 4);
+
     public static MeterCapabilities For(MeterModel model) => model switch
     {
         MeterModel.Eevblog121Gw => Eevblog121Gw,
         MeterModel.Fs9721 => Fs9721,
         MeterModel.Dso150 => Dso150,
+        MeterModel.Dtm0660 => Dtm0660,
         _ => throw new ArgumentOutOfRangeException(nameof(model), model, "No capabilities for this meter."),
     };
 }

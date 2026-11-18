@@ -4,7 +4,8 @@ namespace Readout.Drawing;
 
 /// <summary>
 /// The LCD of an FS9721 meter, laid out like the Miyako 890G's glass: symbols along the top,
-/// AC and DC left of four digits, and a grid of units on the right.
+/// AC and DC left of four digits, and a grid of units on the right. DTM0660 meters get the same
+/// glass with MAX and MIN where the 890G has hFE.
 /// </summary>
 public sealed partial class LcdDrawable
 {
@@ -19,7 +20,13 @@ public sealed partial class LcdDrawable
         [("k", 304), ("M", 322), ("Ω", 346), ("Hz", 368)],
     ];
 
-    private static void DrawFs9721(ICanvas canvas, MeterReading? r, Annunciators i)
+    private static readonly (string Symbol, float X)[][] Dtm0660Units =
+    [
+        [("MAX", 290), ("MIN", 328), ("°F", 368)],
+        .. Fs9721Units[1..],
+    ];
+
+    private static void DrawFs9721(ICanvas canvas, MeterReading? r, Annunciators i, (string Symbol, float X)[][] units)
     {
         // Along the top. RS232 is lit whenever the meter is sending, which it is if there's a reading.
         const float top = 16;
@@ -40,11 +47,16 @@ public sealed partial class LcdDrawable
         SevenSegment.DrawText(canvas, r?.MainText ?? "", new RectF(48, 46, 240, 100), 4, Ink, Ghost);
 
         var (prefix, unit) = SplitUnit(r?.MainUnit ?? "");
-        for (var row = 0; row < Fs9721Units.Length; row++)
+        for (var row = 0; row < units.Length; row++)
         {
-            foreach (var (symbol, x) in Fs9721Units[row])
+            foreach (var (symbol, x) in units[row])
             {
-                var lit = symbol == unit || symbol == prefix;
+                var lit = symbol switch
+                {
+                    "MAX" => i.Max,
+                    "MIN" => i.Min,
+                    _ => symbol == unit || symbol == prefix,
+                };
                 Label(canvas, symbol, x, 46 + row * 26, 15, lit, HorizontalAlignment.Left, 36);
             }
         }

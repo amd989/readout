@@ -4,8 +4,8 @@ namespace Readout.Drawing;
 
 /// <summary>
 /// A drawing of the meter's LCD. For the 121GW: main and sub digits, units, the bar graph and
-/// the symbols around them, in the official app's palette. For an FS9721 meter: its simpler
-/// glass (LcdDrawable.Fs9721.cs).
+/// the symbols around them, in the official app's palette. For an FS9721 or DTM0660 meter: its
+/// simpler glass (LcdDrawable.Fs9721.cs).
 /// </summary>
 public sealed partial class LcdDrawable : IDrawable
 {
@@ -19,7 +19,10 @@ public sealed partial class LcdDrawable : IDrawable
     /// <summary>Width over height, for sizing the view so the drawing fills it.</summary>
     public float AspectRatio => Width / CanvasHeight;
 
-    private float CanvasHeight => Model == MeterModel.Fs9721 ? Fs9721Height : Height;
+    private float CanvasHeight => IsSegmentMeter ? Fs9721Height : Height;
+
+    /// <summary>A meter whose chip sends LCD segments (FS9721, DTM0660): it gets the simpler glass.</summary>
+    private bool IsSegmentMeter => Model is MeterModel.Fs9721 or MeterModel.Dtm0660;
 
     private static readonly Color Glass = Color.FromArgb("#C5CCB9");
     private static readonly Color Ink = Color.FromArgb("#111111");
@@ -50,9 +53,9 @@ public sealed partial class LcdDrawable : IDrawable
         var r = Reading;
         var icons = r?.Icons ?? new Annunciators();
 
-        if (Model == MeterModel.Fs9721)
+        if (IsSegmentMeter)
         {
-            DrawFs9721(canvas, r, icons);
+            DrawFs9721(canvas, r, icons, Model == MeterModel.Dtm0660 ? Dtm0660Units : Fs9721Units);
             canvas.RestoreState();
             return;
         }
