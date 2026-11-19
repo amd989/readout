@@ -218,7 +218,7 @@ public sealed class BleMeterConnection : IMeterConnection, IDisposable
         ICharacteristic? fallback = null;
         foreach (var service in await device.GetServicesAsync(ct))
         {
-            var characteristics = await service.GetCharacteristicsAsync();
+            var characteristics = await service.GetCharacteristicsAsync(ct);
             foreach (var characteristic in characteristics)
             {
                 if (characteristic.Id == MeterBluetooth.DataCharacteristicUuid ||
