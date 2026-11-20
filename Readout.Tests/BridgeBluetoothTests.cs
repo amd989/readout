@@ -11,6 +11,7 @@ public class BridgeBluetoothTests
     [InlineData("Readout FS9721", MeterModel.Fs9721)]
     [InlineData("Readout DSO150 A1B2", MeterModel.Dso150)]
     [InlineData("readout dso150 00ff", MeterModel.Dso150)]
+    [InlineData("Readout DTM0660 A1B2", MeterModel.Dtm0660)]
     public void ModelFromName_Bridge_IsItsChip(string name, MeterModel model) =>
         Assert.Equal(model, BridgeBluetooth.ModelFromName(name));
 
@@ -54,7 +55,7 @@ public class BridgeBluetoothTests
         Assert.Contains("\"Readout %s %02X%02X\"", firmware, StringComparison.Ordinal);
 
         // Every chip it builds for is one the app recognises by name.
-        foreach (var chip in new[] { "FS9721", "DSO150" })
+        foreach (var chip in new[] { "FS9721", "DTM0660", "DSO150" })
         {
             Assert.Contains($"#define CHIP_NAME \"{chip}\"", firmware, StringComparison.Ordinal);
             Assert.NotNull(BridgeBluetooth.ModelFromName($"Readout {chip} A1B2"));

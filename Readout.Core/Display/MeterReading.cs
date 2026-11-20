@@ -14,6 +14,11 @@ public enum MeterModel
     /// protocol is text lines and binary waveform blocks (DSOShell's docs/PROTOCOL.md).
     /// </summary>
     Dso150,
+    /// <summary>
+    /// A meter built on Dream Tech's DTM0660 chip (Aneng V8, Mestek DM91A, UNI-T UT139C…), through
+    /// a DIY Bluetooth bridge, with serial output turned on in the meter's EEPROM.
+    /// </summary>
+    Dtm0660,
 }
 
 /// <summary>Everything the meter's LCD shows for one packet or frame, decoded for display and logging.</summary>

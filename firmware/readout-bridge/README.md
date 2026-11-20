@@ -10,6 +10,7 @@ last four hex digits of its MAC), and the app picks the driver from that name.
 | Chip | Builds | Direction | Serial | Wiring | Sleeps |
 |---|---|---|---|---|---|
 | FS9721 (cheap meters) | `fs9721-esp32dev`, `fs9721-esp32dev-vdd`, `fs9721-esp32c3`, `fs9721-esp32c3-vdd` | meter to app | 2400 8N1 | optocoupler | after 10 s without data |
+| [DTM0660](#dtm0660-meters) (cheap meters) | `dtm0660-esp32dev`, `dtm0660-esp32dev-vdd`, `dtm0660-esp32c3`, `dtm0660-esp32c3-vdd` | meter to app | 2400 8N1 | optocoupler | after 10 s without data |
 | DSO150 running [DSOShell](#dso150-oscilloscope) | `dso150-esp32dev`, `dso150-esp32c3` | both ways | 115200 8N1 | direct, 3.3 V | never |
 
 Boards: a classic ESP32 such as an ESP-WROOM-32 DevKit (`esp32dev`), or an ESP32-C3 such as
@@ -131,7 +132,7 @@ The monitor prints each frame as it's forwarded, so you can check the wiring bef
 the app:
 
 ```
-Readout bridge 0.3.0 (powered on): FS9721 on GPIO 33, inverted
+Readout bridge 0.4.0 (powered on): FS9721 on GPIO 33, inverted
 advertising as "Readout FS9721 A1B2"
 17 25 3b 4f 5f 67 7f 87 9f a0 b0 c0 d4 e8
 …
@@ -151,6 +152,29 @@ for 5 seconds, the bridge says what the input pin is doing, and how far its volt
 
 The LED blinks with each frame (GPIO 2 on dev boards, GPIO 8 on the C3 SuperMini). After a
 wake-up the first line says "woken by the meter".
+
+## DTM0660 meters
+
+Cheap meters built on Dream Tech's DTM0660 (Aneng V8, Mestek DM91A, UNI-T UT139C, and others
+in `docs/SERIAL-METERS.md`). Everything in [FS9721 meters](#fs9721-meters) applies: the same
+optocoupler, wiring, power and sleep, with the `dtm0660-*` build that matches your wiring. Only
+the chip's pins and how its serial output is turned on differ:
+
+- TX is pin 20 of the DTM0660 (LQFP-64). There's no ENTX pin: serial output is a setting in the
+  meter's I²C EEPROM (a 24C02 or 24C08 next to the chip), off from the factory. That EEPROM also
+  holds the meter's calibration, so read it out and keep a copy before changing anything, then
+  change only the serial setting. Which byte and bit that is comes from the DTM0660 datasheet's
+  EEPROM table; the EEVblog thread "Hacking DTM0660L based multimeters" collects dumps and edits
+  for several meters.
+- Frames are 15 bytes, numbered `1x` to `fx`, so a good monitor line reads
+  `1e 21 3a … e0 f8`.
+- Some EEPROM settings make the chip send 14-byte frames in the FS9721's format instead. If your
+  lines stop at `ex`, flash the `fs9721-*` build matching your wiring: the app reads those as an
+  FS9721.
+
+No DTM0660 meter has been tried with the bridge yet: the decoder is written from libsigrok's
+description of the frames and checked against the FS9721 captures. A capture from a real meter,
+added to `Readout.Tests/TestData/`, would settle it.
 
 ## DSO150 oscilloscope
 
@@ -198,7 +222,7 @@ whole path.
    `dso150-esp32dev`). The monitor says:
 
    ```
-   Readout bridge 0.3.0 (powered on): DSO150 at 115200 baud, RX on GPIO 20, TX on GPIO 21
+   Readout bridge 0.4.0 (powered on): DSO150 at 115200 baud, RX on GPIO 20, TX on GPIO 21
    advertising as "Readout DSO150 A1B2"
    ```
 
@@ -206,7 +230,7 @@ whole path.
    Android, ask for MTU 247 from the menu (iOS negotiates by itself); the monitor prints
    `mtu 247: notifications of up to 244 bytes`.
 4. In service `1ac73563-…`:
-   - read INFO (`6daa6868-…`): `chip=DSO150`, `baud=115200`, `firmware=0.3.0`.
+   - read INFO (`6daa6868-…`): `chip=DSO150`, `baud=115200`, `firmware=0.4.0`.
    - turn on notifications for DATA (`4d19a30c-…`).
    - write to RX (`3065c3ca-…`) the bytes `2A 49 44 4E 3F 0A` (`*IDN?` and a newline;
      nRF Connect's text mode doesn't add the newline, so send it as a byte array).
@@ -262,11 +286,11 @@ In `platformio.ini`:
 
 | Flag | What it is |
 |---|---|
-| `CHIP_DSO150` | Build for the DSO150 (two-way); without it, the FS9721 |
+| `CHIP_DTM0660`, `CHIP_DSO150` | Build for the DTM0660, or the DSO150 (two-way); without either, the FS9721 |
 | `UART_RX_PIN`, `UART_TX_PIN` | The GPIOs the chip's TX reaches and its RX is driven from. For the FS9721, RX must be able to wake the chip |
 | `UART_RX_INVERTED` | FS9721: 1 when TXD lights the LED; 0 when VDD does, or TXD is wired straight to the pin. Set by the build you pick |
-| `UART_BAUD` | 2400 for the FS9721, 115200 for the DSO150 |
-| `SLEEP_AFTER_S` | Deep sleep after this many seconds without data (10 for the FS9721); 0 never sleeps (the DSO150's default) |
+| `UART_BAUD` | 2400 for the FS9721 and DTM0660, 115200 for the DSO150 |
+| `SLEEP_AFTER_S` | Deep sleep after this many seconds without data (10 for the meters); 0 never sleeps (the DSO150's default) |
 | `METER_SYMBOLS` | FS9721: the meter's four maker-chosen LCD symbols, bit 0 first (`°F,hFE,°C,` on the Miyako 890G) |
 | `LED_PIN`, `LED_ACTIVE_LOW` | The status LED, or -1 for none. It blinks with each chunk, both ways |
 
@@ -279,7 +303,7 @@ name format and the MTU against this firmware):
 |---|---|---|
 | `1ac73563-3941-40bc-90d4-47fb89f88271` | Service | In the scan response (the name is in the advertisement) |
 | `4d19a30c-94d7-404e-a69d-b513188f13dc` | Notify | The chip's bytes as they arrive, up to MTU less 3 per notification |
-| `6daa6868-77cd-4539-8b02-6a82b3c6bc0c` | Read | `chip=FS9721` or `chip=DSO150`, `baud=…`, `firmware=…` and, for the FS9721, `symbols=…`, one per line |
+| `6daa6868-77cd-4539-8b02-6a82b3c6bc0c` | Read | `chip=FS9721`, `chip=DTM0660` or `chip=DSO150`, `baud=…`, `firmware=…` and, for the FS9721, `symbols=…`, one per line |
 | `3065c3ca-b78a-4b98-96b6-280cf0784ec4` | Write, write without response | DSO150 builds only: bytes for the chip, out the UART unchanged |
 
 The app writes to RX with a response (a write longer than the MTU allows goes as a long write,

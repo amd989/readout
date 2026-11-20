@@ -17,7 +17,7 @@ public static class BridgeBluetooth
     public static readonly Guid DataCharacteristicUuid = Guid.Parse("4D19A30C-94D7-404E-A69D-B513188F13DC");
 
     /// <summary>
-    /// Readable text, one <c>key=value</c> per line: <c>chip</c> (FS9721, DSO150), <c>symbols</c>
+    /// Readable text, one <c>key=value</c> per line: <c>chip</c> (FS9721, DTM0660, DSO150), <c>symbols</c>
     /// (an FS9721 meter's maker-chosen symbols, comma separated), <c>baud</c> and <c>firmware</c>.
     /// </summary>
     public static readonly Guid InfoCharacteristicUuid = Guid.Parse("6DAA6868-77CD-4539-8B02-6A82B3C6BC0C");
@@ -39,6 +39,7 @@ public static class BridgeBluetooth
         var chip = name[NamePrefix.Length..].Split(' ', 2)[0];
         if (chip.Equals("FS9721", StringComparison.OrdinalIgnoreCase)) return MeterModel.Fs9721;
         if (chip.Equals("DSO150", StringComparison.OrdinalIgnoreCase)) return MeterModel.Dso150;
+        if (chip.Equals("DTM0660", StringComparison.OrdinalIgnoreCase)) return MeterModel.Dtm0660;
         return null;
     }
 

@@ -118,6 +118,7 @@ public sealed class MeterTools(
             {
                 MeterModel.Fs9721 => "FS9721",
                 MeterModel.Dso150 => "DSO150",
+                MeterModel.Dtm0660 => "DTM0660",
                 _ => "121GW",
             },
             session.Capabilities.RemoteKeys,
