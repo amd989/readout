@@ -65,7 +65,7 @@ Windows and Linux. Built with .NET 10 and .NET MAUI.
 |---|---|
 | iOS / iPadOS 15+ | ✅ |
 | macOS (Mac Catalyst) 12+ | ✅ |
-| Android 6+ | ✅ |
+| Android 7+ | ✅ |
 | Windows 10/11 | ✅ builds on Windows |
 | Linux (GTK 4.12+, BlueZ) | Preview: MAUI's GTK4 backend, see [Linux](#linux) |
 
