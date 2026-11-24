@@ -74,12 +74,15 @@ builds.
 | | v1.2.3 gives | Must grow with each upload |
 |---|---|---|
 | Windows | 1.2.3.0 | the whole version |
-| Android | versionName 1.2.3, versionCode from the UTC date and time (yyDDDHHMM) | versionCode |
+| Android | versionName 1.2.3, versionCode 102039 (major, minor, patch, then 9; prerelease N gets N) | versionCode |
 | iOS and Mac | 1.2.3, build from the date and time (yymmdd.HHMM) | build, per version |
 
 The Microsoft Store already has 1.0.yyDDD.0 builds from `publish-windows.ps1`'s date scheme,
-so the first tag must be **v1.1.0** or later; v1.0.x would be a lower version. The patch number
-can't go above 65535.
+so the first tag must be **v1.1.0** or later; v1.0.x would be a lower version. The minor and
+patch numbers can't go above 99, nor a prerelease's number above 8 (`v1.2.3-beta.8`), or Google
+Play's versionCode would run into the next digit. The versionCode is kept small on purpose:
+Google Play refused a first release whose date-based code (263272313) started far up its
+range, which ends at 2,100,000,000.
 
 ## One-time setup
 

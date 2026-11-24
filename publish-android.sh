@@ -12,15 +12,24 @@ set -e
 #   DISPLAY_VERSION            versionName, like 1.2.3 (defaults to ApplicationDisplayVersion)
 #
 # ./publish-android.sh [versionCode]
-# Each upload needs a higher versionCode than the last: the UTC date and time as yyDDDHHMM
-# (263101702), or pass one.
+# Each upload needs a higher versionCode than the last. By default it comes from versionName as
+# release.yml makes it: major, minor, patch, then 9 for a release (1.2.1 is 102019; prerelease N
+# of a version gets N in place of the 9). Pass one to upload the same version again. Keep codes
+# small: Play refuses a first release whose code starts far up its range (2,100,000,000 at most).
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJ="$SCRIPT_DIR/Readout"
 PUBLISH="$PROJ/bin/Release/net10.0-android/publish"
 OUT="$SCRIPT_DIR/artifacts/android"
-BUILD="${1:-$(date -u +%y%j%H%M)}"
 NAME="${DISPLAY_VERSION:-$(sed -n 's:.*<ApplicationDisplayVersion>\(.*\)</ApplicationDisplayVersion>.*:\1:p' "$PROJ/Readout.csproj" | head -1)}"
+if [ -n "$1" ]; then
+  BUILD="$1"
+elif [[ "$NAME" =~ ^([0-9]+)\.([0-9]+)(\.([0-9]+))?$ ]]; then
+  BUILD=$(( ((10#${BASH_REMATCH[1]} * 100 + 10#${BASH_REMATCH[2]}) * 100 + 10#${BASH_REMATCH[4]:-0}) * 10 + 9 ))
+else
+  echo "Can't make a versionCode from versionName $NAME; pass one." >&2
+  exit 1
+fi
 
 : "${ANDROID_KEYSTORE:?Set ANDROID_KEYSTORE to the upload keystore.}"
 : "${ANDROID_KEY_ALIAS:?Set ANDROID_KEY_ALIAS to the key alias.}"

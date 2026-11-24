@@ -90,6 +90,27 @@ jobs:
 
           prerelease=false
           if [ -n "${BASH_REMATCH[4]}" ]; then prerelease=true; fi
+
+          # Google Play's versionCode comes from the version: major, minor and patch, then a
+          # digit for the stage (1 to 8 for the Nth prerelease, 9 for the release), so v1.2.1
+          # is 102019 and v1.2.1-beta.2 is 102012. Play refuses a first release whose code
+          # starts far up its range (a date-based 263272313 was refused); the cap is 2.1 billion.
+          suffix=${BASH_REMATCH[4]}
+          if (( 10#$minor > 99 || 10#$patch > 99 )); then
+            echo "::error::Google Play's versionCode has two digits each for the minor and patch numbers (up to 99)."
+            exit 1
+          fi
+          stage=9
+          if [ -n "$suffix" ]; then
+            stage=1
+            if [[ "$suffix" =~ ([0-9]+)$ ]]; then stage=$((10#${BASH_REMATCH[1]})); fi
+            if (( stage < 1 || stage > 8 )); then
+              echo "::error::Google Play's versionCode has room for prereleases 1 to 8 of a version, not $suffix."
+              exit 1
+            fi
+          fi
+          version_code=$(( ((10#$major * 100 + 10#$minor) * 100 + 10#$patch) * 10 + stage ))
+
           # The Microsoft Store has no beta channel here, and a prerelease would take the
           # final release's version (v1.2.0-beta.1 and v1.2.0 are both 1.2.0.0).
           if [ "$prerelease" = true ]; then WINDOWS=false; fi
@@ -121,8 +142,7 @@ jobs:
             echo "major_minor=$major.$minor"
             echo "patch=$patch"
             echo "prerelease=$prerelease"
-            # Google Play's versionCode must grow with each upload: the UTC date and time.
-            echo "version_code=$(date -u +%y%j%H%M)"
+            echo "version_code=$version_code"
             echo "submit=$submit"
             echo "windows=$WINDOWS"
             echo "android=$ANDROID"
