@@ -1,12 +1,12 @@
 # Releases from a git tag. Push vX.Y.Z (or vX.Y.Z-beta.1 for a prerelease) and this:
 #   1. runs the tests,
 #   2. builds the Microsoft Store bundle, the Google Play .aab (plus an .apk), the iPhone/iPad
-#      .ipa, the Mac .pkg and the Linux tarballs, .deb and .rpm packages, with the version taken
-#      from the tag,
+#      .ipa, the Mac .pkg, the Linux tarballs, .deb and .rpm packages and the snaps, with the
+#      version taken from the tag,
 #   3. publishes a GitHub release with notes from the commit messages, the .apk and the Linux
-#      tarballs and packages (Linux has no store, so this is where it ships),
+#      tarballs and packages,
 #   4. sends the packages to each store. Each store job waits in its environment
-#      (microsoft-store, google-play, app-store) until a reviewer approves it,
+#      (microsoft-store, google-play, app-store, snap-store) until a reviewer approves it,
 #   5. for a final release, asks amd989/packages to put the .deb and .rpm on
 #      packages.alejandro.md (needs the PACKAGES_DISPATCH_TOKEN secret).
 # Setup, secrets and version numbers: docs/STORE-CI.md.
@@ -30,6 +30,10 @@ on:
         default: true
       apple:
         description: "App Store (iPhone, iPad and Mac)"
+        type: boolean
+        default: true
+      snap:
+        description: "Snap Store"
         type: boolean
         default: true
       github:
@@ -58,6 +62,7 @@ jobs:
       android: ${{ steps.tag.outputs.android }}
       android_build: ${{ steps.tag.outputs.android_build }}
       apple: ${{ steps.tag.outputs.apple }}
+      snap: ${{ steps.tag.outputs.snap }}
       github: ${{ steps.tag.outputs.github }}
     steps:
       - name: Read the tag
@@ -67,6 +72,7 @@ jobs:
           WINDOWS: ${{ github.event_name == 'push' || inputs.windows }}
           ANDROID: ${{ github.event_name == 'push' || inputs.android }}
           APPLE: ${{ github.event_name == 'push' || inputs.apple }}
+          SNAP: ${{ github.event_name == 'push' || inputs.snap }}
           RELEASE: ${{ github.event_name == 'push' || inputs.github }}
           AUTO_SUBMIT: ${{ vars.STORE_AUTO_SUBMIT }}
           # Whether the build signing secrets are set (true/false only, never their values).
@@ -115,8 +121,9 @@ jobs:
           # final release's version (v1.2.0-beta.1 and v1.2.0 are both 1.2.0.0).
           if [ "$prerelease" = true ]; then WINDOWS=false; fi
           # Off: Google Play gets a draft to roll out from its console. Never for prereleases.
-          # (The Microsoft Store always submits once its job is approved; the App Store always
-          # waits for a review submission in App Store Connect.)
+          # Off, the snaps go to the candidate channel, to promote on snapcraft.io. (The
+          # Microsoft Store always submits once its job is approved; the App Store always waits
+          # for a review submission in App Store Connect.)
           submit=false
           if [ "$AUTO_SUBMIT" = true ] && [ "$prerelease" = false ]; then submit=true; fi
 
@@ -148,6 +155,7 @@ jobs:
             echo "android=$ANDROID"
             echo "android_build=$android_build"
             echo "apple=$APPLE"
+            echo "snap=$SNAP"
             echo "github=$RELEASE"
           } | tee -a "$GITHUB_OUTPUT"
 
@@ -246,8 +254,8 @@ jobs:
             artifacts/android/*.aab
             artifacts/android/*.apk
 
-  # Only shipped on the GitHub release. Plain net10.0 on MAUI's GTK4 backend: no workload, and
-  # arm64 cross-publishes from x64.
+  # For the GitHub release and packages.alejandro.md (the snap job builds its own). Plain
+  # net10.0 on MAUI's GTK4 backend: no workload, and arm64 cross-publishes from x64.
   linux:
     needs: [version, test]
     if: needs.version.outputs.github == 'true'
@@ -326,6 +334,51 @@ jobs:
             artifacts/linux/*.tar.gz
             artifacts/linux/*.deb
             artifacts/linux/*.rpm
+
+  # The same Linux build as a snap per architecture, for the Snap Store. Built on a native
+  # runner for each: snapcraft's gnome extension doesn't cross-build.
+  snap:
+    needs: [version, test]
+    if: needs.version.outputs.snap == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build the app
+        env:
+          DISPLAY_VERSION: ${{ needs.version.outputs.version }}
+          BUILD_NUMBER: ${{ needs.version.outputs.version_code }}
+        run: ./publish-linux.sh ${{ matrix.arch }}
+
+      # The tag without its v, so a prerelease shows as 1.2.3-beta.1 in the Store.
+      - name: Set the snap's version
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          sed -i "s/^version: .*/version: '${TAG#v}'/" snap/snapcraft.yaml
+          grep '^version:' snap/snapcraft.yaml
+
+      - uses: snapcore/action-build@v1
+        id: build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snap-${{ matrix.arch }}
+          path: ${{ steps.build.outputs.snap }}
 
   apple:
     needs: [version, test]
@@ -692,4 +745,49 @@ jobs:
           done
           for f in packages/*.pkg; do
             xcrun altool --upload-app --type macos --file "$f" --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+          done
+
+  snap-store:
+    needs: [version, snap]
+    runs-on: ubuntu-latest
+    environment: snap-store
+    steps:
+      - name: Check the secrets
+        id: secrets
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        run: |
+          if [ -z "$SNAPCRAFT_STORE_CREDENTIALS" ]; then
+            echo "::warning title=Snap Store skipped::Not set: SNAPCRAFT_STORE_CREDENTIALS"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/download-artifact@v4
+        if: steps.secrets.outputs.ok == 'true'
+        with:
+          pattern: snap-*
+          path: packages
+          merge-multiple: true
+
+      - name: Install snapcraft
+        if: steps.secrets.outputs.ok == 'true'
+        run: sudo snap install snapcraft --classic
+
+      # Prereleases go to beta. A final release goes to candidate, to promote to stable on
+      # snapcraft.io (Releases), or straight to stable with auto submit.
+      - name: Upload to the Snap Store
+        if: steps.secrets.outputs.ok == 'true'
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+          CHANNEL: >-
+            ${{ needs.version.outputs.prerelease == 'true' && 'beta'
+            || needs.version.outputs.submit == 'true' && 'stable' || 'candidate' }}
+        run: |
+          shopt -s nullglob
+          snaps=(packages/*.snap)
+          if [ ${#snaps[@]} -eq 0 ]; then echo "::error::No snaps to upload."; exit 1; fi
+          for f in "${snaps[@]}"; do
+            snapcraft upload --release="$CHANNEL" "$f"
           done

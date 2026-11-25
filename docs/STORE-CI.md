@@ -6,10 +6,10 @@
 2. builds every store package with the version from the tag, using the same scripts as a
    local release: `publish-windows.ps1` (x64 + arm64 bundle), `publish-android.sh` (.aab and
    .apk), `publish-ios.sh` (.ipa), `publish-mac.sh` (.pkg), and `publish-linux.sh` plus
-   `package-linux.sh` (x64 and arm64 tarballs, .deb and .rpm);
+   `package-linux.sh` (x64 and arm64 tarballs, .deb and .rpm), and `snap/snapcraft.yaml`
+   (amd64 and arm64 snaps);
 3. publishes a GitHub release with notes built from the commit messages since the last
-   release, with the .apk (for sideloading) and the Linux tarballs and packages attached.
-   Linux has no store, so the GitHub release is where it ships;
+   release, with the .apk (for sideloading) and the Linux tarballs and packages attached;
 4. sends the packages to the stores, each job waiting for approval in its environment;
 5. for a final release, asks `amd989/packages` to publish the .deb and .rpm on
    packages.alejandro.md.
@@ -30,6 +30,7 @@ Then approve the store jobs in the run (Actions > Release > Review deployments).
 | Microsoft Store | Uploads the bundle to Partner Center | Submitted for certification | Same |
 | Google Play | Uploads the .aab to a track (`PLAY_TRACK`, default `internal`) | Draft release, rolled out from the Play Console | Rolled out (`completed`) |
 | App Store | Uploads the .ipa and .pkg to App Store Connect | In TestFlight; submit for review in App Store Connect | Same (review submission stays manual) |
+| Snap Store | Uploads the amd64 and arm64 snaps | Released to `candidate`; promote to `stable` on snapcraft.io | Released to `stable` |
 | GitHub | Creates the release with notes, the .apk and the Linux tarballs and packages | Published | Published |
 
 `STORE_AUTO_SUBMIT` and `PLAY_TRACK` are repository variables (Settings > Secrets and
@@ -42,8 +43,8 @@ submission when the submission is committed (which is what submits it): an uncom
 kept the previous version's packages, and the new bundle never showed up. To check a build
 before it goes out, download the run's `windows-store` artifact and test it before approving.
 
-**Prereleases** (`v1.2.0-beta.1`): a GitHub prerelease, Google Play internal testing and
-TestFlight, never auto submitted. The Microsoft Store is skipped: it would take the final
+**Prereleases** (`v1.2.0-beta.1`): a GitHub prerelease, Google Play internal testing,
+TestFlight and the Snap Store's `beta` channel, never auto submitted. The Microsoft Store is skipped: it would take the final
 version's number.
 
 **Re-running:** Actions > Release > Run workflow takes an existing tag and which stores to
@@ -57,7 +58,7 @@ shows a warning naming the secrets that aren't set.
   on the GitHub release.
 - Without the Apple signing secrets: no iPhone or Mac build.
 - Without a store's upload secrets (`STORE_*`, `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`,
-  `APP_STORE_CONNECT_*`): the package is built, but that store's job uploads nothing. Those
+  `APP_STORE_CONNECT_*`, `SNAPCRAFT_STORE_CREDENTIALS`): the package is built, but that store's job uploads nothing. Those
   secrets can live in the store's environment, which only its own job can read, so that job
   still asks for approval before it finds out.
 - Without `PACKAGES_DISPATCH_TOKEN`: the .deb and .rpm are on the GitHub release, but
@@ -76,6 +77,7 @@ builds.
 | Windows | 1.2.3.0 | the whole version |
 | Android | versionName 1.2.3, versionCode 102039 (major, minor, patch, then 9; prerelease N gets N) | versionCode |
 | iOS and Mac | 1.2.3, build from the date and time (yymmdd.HHMM) | build, per version |
+| Snap | 1.2.3 (a prerelease keeps its suffix: 1.2.3-beta.1) | nothing: the Store numbers each upload's revision |
 
 The Microsoft Store already has 1.0.yyDDD.0 builds from `publish-windows.ps1`'s date scheme,
 so the first tag must be **v1.1.0** or later; v1.0.x would be a lower version. The minor and
@@ -156,6 +158,41 @@ it can't update a copy installed from Google Play (or the other way round).
 
 The Apple builds run on the `macos-26` runner with its newest stable Xcode, which .NET 10's iOS
 SDK needs.
+
+### Snap Store (environment `snap-store`)
+
+1. **Account and name.** Sign in to snapcraft.io with an Ubuntu One account, then register the
+   name from any machine with snapcraft (`sudo snap install snapcraft --classic`):
+   ```bash
+   snapcraft login
+   snapcraft register readout
+   ```
+2. **Credentials.** Export a login limited to this snap and to uploading and releasing (a year
+   at most; the upload fails once it lapses, so export a new one before then):
+   ```bash
+   snapcraft export-login --snaps=readout --acls=package_access,package_push,package_update,package_release --expires=2027-11-24 readout-snap.login
+   ```
+3. **Environment secret:** `SNAPCRAFT_STORE_CREDENTIALS`, the file's contents. Delete the file.
+4. **Bluetooth.** The meter needs the `bluez` interface, which a snap from the Store doesn't get
+   on install. Until the Store grants auto-connection, users run
+   `sudo snap connect readout:bluez` once (the snap's description says so). Ask for it in the
+   [store-requests](https://forum.snapcraft.io/c/store-requests/19) category of the Snapcraft
+   forum: "auto-connect `bluez` for `readout`", saying it's a Bluetooth LE multimeter app that
+   can do nothing else without it.
+
+The listing (screenshots, links, categories) is edited on snapcraft.io > the snap > Listing; the
+summary, description and icon come from `snap/snapcraft.yaml` on each upload.
+
+The snaps are built on native runners (`ubuntu-24.04` and `ubuntu-24.04-arm`) by
+`snapcore/action-build`, which packs `publish-linux.sh`'s build with snapcraft in an LXD
+container. GTK comes from the gnome extension's GNOME 46 runtime (GTK 4.14), so the snap itself
+carries only the app, ICU and OpenSSL. Locally, on Ubuntu with snapcraft:
+
+```bash
+./publish-linux.sh x64 && snapcraft pack
+sudo snap install --dangerous readout_0+dev_amd64.snap
+sudo snap connect readout:bluez
+```
 
 ### GitHub release
 

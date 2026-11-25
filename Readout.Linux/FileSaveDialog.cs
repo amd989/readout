@@ -15,9 +15,14 @@ internal static class FileSaveDialog
         dialog.SetInitialName(suggestedName);
         dialog.SetModal(true);
         // Documents (XDG_DOCUMENTS_DIR), else home: GTK would otherwise start wherever the app was run from.
-        var folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        if (!Directory.Exists(folder)) folder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        if (Directory.Exists(folder)) dialog.SetInitialFolder(Gio.FileHelper.NewForPath(folder));
+        // Not in a snap: home there is the snap's own folder, and the portal's dialog, which runs
+        // outside the sandbox, already starts somewhere sensible.
+        if (Environment.GetEnvironmentVariable("SNAP") is null)
+        {
+            var folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            if (!Directory.Exists(folder)) folder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (Directory.Exists(folder)) dialog.SetInitialFolder(Gio.FileHelper.NewForPath(folder));
+        }
 
         Gio.File? file;
         try
