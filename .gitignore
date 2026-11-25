@@ -495,3 +495,9 @@ store/*.md
 *.p8
 *.mobileprovision
 *.provisionprofile
+
+# snapcraft (destructive-mode builds and the packed snaps)
+/parts/
+/stage/
+/prime/
+*.snap

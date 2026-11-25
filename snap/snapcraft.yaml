@@ -1,0 +1,81 @@
+# The Linux build as a snap, for the Snap Store. It packs publish-linux.sh's self-contained
+# build for the architecture being built, so build that first:
+#   ./publish-linux.sh x64 && snapcraft pack        (on amd64; arm64 needs an arm64 machine)
+# The release workflow builds both natively and uploads them (docs/STORE-CI.md). GTK 4.14
+# comes from the gnome extension's GNOME 46 runtime, so the snap only carries the app.
+#
+# The meter needs the bluez interface, which isn't connected on install until the Store grants
+# auto-connection: sudo snap connect readout:bluez. READOUT_FAKE_BLE=1 readout runs the demo
+# meter without it.
+name: readout
+title: Readout
+base: core24
+# The release workflow writes the tag's version here (1.2.3, or 1.2.3-beta.1).
+version: '0+dev'
+summary: Live readings, graphs and logs from a Bluetooth multimeter
+description: |
+  Readout is a companion app for the EEVblog 121GW multimeter over Bluetooth LE. It shows the
+  meter's display, graphs readings over time, logs and exports them as CSV, and presses the
+  meter's buttons remotely.
+
+  The Linux build is a preview on the GTK4 backend for .NET MAUI. It needs BlueZ and a
+  Bluetooth LE adapter; the demo meter works without either. After installing, connect
+  Bluetooth with: sudo snap connect readout:bluez
+license: MIT
+icon: docs/icon.svg
+website: https://github.com/amd989/readout
+source-code: https://github.com/amd989/readout
+issues: https://github.com/amd989/readout/issues
+grade: stable
+confinement: strict
+# Starts much faster than xz, for a few more megabytes.
+compression: lzo
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  readout:
+    command: usr/lib/readout/Readout
+    extensions: [gnome]
+    common-id: md.alejandro.readout
+    desktop: usr/share/applications/md.alejandro.readout.desktop
+    plugs:
+      - bluez         # the meter, through BlueZ on the system bus
+      - network-bind  # the MCP server's listener on 127.0.0.1 (the app makes no outbound calls)
+    environment:
+      # .NET finds ICU by dlopen, and the staged one isn't on the runtime's library path.
+      LD_LIBRARY_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:${LD_LIBRARY_PATH}
+
+parts:
+  readout:
+    plugin: dump
+    source:
+      - on amd64: Readout.Linux/bin/publish/linux-x64/readout
+      - on arm64: Readout.Linux/bin/publish/linux-arm64/readout
+    organize:
+      '*': usr/lib/readout/
+    # What .NET loads besides GTK: ICU for globalization, OpenSSL for TLS.
+    stage-packages:
+      - libicu74
+      - libssl3t64
+    override-build: |
+      craftctl default
+      app="$CRAFT_PART_INSTALL/usr/lib/readout"
+      # As in package-linux.sh: the LTTng tracing provider links liblttng-ust, which nothing
+      # else needs, and the hicolor folder makes the GTK backend write its own .desktop file.
+      rm -f "$app/libcoreclrtraceptprovider.so"
+      rm -rf "$app/hicolor"
+
+  desktop:
+    plugin: nil
+    source: packaging/linux
+    override-build: |
+      share="$CRAFT_PART_INSTALL/usr/share"
+      install -Dm644 md.alejandro.readout.desktop "$share/applications/md.alejandro.readout.desktop"
+      # The icon by path: the desktop outside the snap can't find it by name.
+      sed -i 's|^Icon=.*|Icon=${SNAP}/usr/share/icons/hicolor/scalable/apps/md.alejandro.readout.svg|' \
+        "$share/applications/md.alejandro.readout.desktop"
+      install -Dm644 md.alejandro.readout.metainfo.xml "$share/metainfo/md.alejandro.readout.metainfo.xml"
+      install -Dm644 "$CRAFT_PROJECT_DIR/docs/icon.svg" "$share/icons/hicolor/scalable/apps/md.alejandro.readout.svg"
